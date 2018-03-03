@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Getting Started with Python on IBM Cloud
 
 To get started, we'll take you through a sample Python Flask app, help you set up a development environment, deploy to IBM Cloud and add a Cloudant database.
@@ -135,3 +136,6 @@ cf push
   ```
 
   View your app at the URL listed in the output of the push command, for example, *myUrl.mybluemix.net*.
+=======
+# LuftKvalitet
+>>>>>>> f7fb33660281eeb135ca32015da8b97d0d7637a1
