@@ -1,5 +1,5 @@
 ---
 applications:
- - name: GetStartedPython
+ - name: luftkvalitet
    random-route: true
-   memory: 128M
+   memory: 1GB
