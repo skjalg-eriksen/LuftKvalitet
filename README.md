@@ -139,3 +139,4 @@ cf push
 =======
 # LuftKvalitet
 >>>>>>> f7fb33660281eeb135ca32015da8b97d0d7637a1
+luftkvalitet bachelor
