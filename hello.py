@@ -17,14 +17,15 @@ import pyproj
 import utm
 
 import dataset
-from semivariogram import SVh, SV, C
-from spherical_mod import spherical, opt, cvmodel
-from krige import krige
+from krige import SVh, SV, C, spherical, opt, cvmodel, krige
+from mpl_toolkits.basemap import Basemap
+import datetime
 
 #map corners
 LEFT = 593065.1648494017; 
 BOTTOM = 6638524.509011956;
-RIGHT = 605365.439142052; TOP = 6648891.652304975;
+RIGHT = 605365.439142052; 
+TOP = 6648891.652304975;
 
 
 # Emit Bluemix deployment event
@@ -129,60 +130,68 @@ def spherical_model_plot():
   
 @app.route('/kriging_plot')
 def kriging_plot():
-  z = dataset.data()
-    
+  z = dataset.data();
+  # part of our data set recording porosity
   P = np.array( z[['x','y','value']] )
   # bandwidth, plus or minus 250 meters
-  bw = 500
+  bw = 15500
   # lags in 500 meter increments from zero to 10,000
-  #hs = np.arange(0,13050,bw)
-  hs = np.arange(0,RIGHT,bw)
+  # hs = np.arange(0,10500,bw)
+  hs = np.arange(0,20000, bw)
   sv = SV( P, hs, bw )
-  #sp = cvmodel( P, model=spherical, hs=np.arange(0,13050, 500), bw=500 )
-  
-  # calculate the kriging estimate at a number of unsampled points
-  X0, X1 = P[:,0].min(), P[:,0].max()
-  Y0, Y1 = P[:,1].min(), P[:,1].max()
-  
-  Z = np.zeros((80,100))
-  dx, dy = (X1-X0)/100.0, (Y1-Y0)/80.0
-  
-  for i in range(80):
+
+
+  X0, X1 = 0, RIGHT-LEFT
+  Y0, Y1 = 0, TOP-BOTTOM
+
+
+  nx = 50
+  ny = 47
+  num_points = 7
+  Z = np.zeros((ny,nx))
+  dx, dy = (X1-X0)/float(nx), (Y1-Y0)/float(ny)
+  for i in range(nx):
       print (i),
-      for j in range(100):
-         Z[i,j] = krige( P, spherical, hs, bw, (dy*j,dx*i), 8 )
+      for j in range(ny):
+          x = X0 + i*dx
+          y = Y0 + j*dy
+          Z[j,i] = krige( P, spherical, hs, bw, (x, y), num_points )
 
   cdict = {'red':   ((0.0, 1.0, 1.0),
-                     (0.5, 225/255., 225/255. ),
-                     (0.75, 0.141, 0.141 ),
-                     (1.0, 0.0, 0.0)),
-           'green': ((0.0, 1.0, 1.0),
-                     (0.5, 57/255., 57/255. ),
-                     (0.75, 0.0, 0.0 ),
-                     (1.0, 0.0, 0.0)),
-           'blue':  ((0.0, 0.376, 0.376),
-                     (0.5, 198/255., 198/255. ),
-                     (0.75, 1.0, 1.0 ),
-                     (1.0, 0.0, 0.0)) }
+                   (0.5, 225/255., 225/255. ),
+                   (0.75, 0.141, 0.141 ),
+                   (1.0, 0.0, 0.0)),
+         'green': ((0.0, 1.0, 1.0),
+                   (0.5, 57/255., 57/255. ),
+                   (0.75, 0.0, 0.0 ),
+                   (1.0, 0.0, 0.0)),
+         'blue':  ((0.0, 0.376, 0.376),
+                   (0.5, 198/255., 198/255. ),
+                   (0.75, 1.0, 1.0 ),
+                   (1.0, 0.0, 0.0)) }
 
   my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
 
   fig, ax = subplots()
+  fig.dpi=400
   H = np.zeros_like( Z )
   for i in range( Z.shape[0] ):
       for j in range( Z.shape[1] ):
           H[i,j] = np.round( Z[i,j]*3 )
+          
+  #m = Basemap(llcrnrlon=10.662291,llcrnrlat= 59.873800,urcrnrlon=10.887139,urcrnrlat=59.963886,
+  #             resolution='f',projection='tmerc',lon_0=6.7806151842031,lat_0=60.479443366542, ax = ax)
+  #m.drawcoastlines()
 
-  ax.matshow( H, cmap=my_cmap, interpolation='nearest' )
-  ax.scatter( z.x/200.0, z.y/200.0, facecolor='none', linewidths=0.75, s=50 )
-  xlim(0, 99) ; ylim(0, 80)
-  xticks( [25,50,75], [5000,10000,15000] )
-  yticks( [25,50,75], [5000,10000,15000] )
-   
-  savefig( 'krigingpurple.png', fmt='png', dpi=200 )
-
-
-  return 'work in progress, kriging'
+  #ax.matshow( H, cmap=my_cmap, interpolation='nearest' )
+  ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='nearest', alpha=0.7, extent=[X0, X1, Y0, Y1])
+  sc = ax.scatter( z.x, z.y, cmap=my_cmap, c=z.value, linewidths=0.75, s=50 )
+  #xlim(0,nx) ; ylim(0,ny)
+  plt.colorbar(sc)
+  name='component: ' + str(z['component'].iloc[0]) + ', date: ' + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+  fig.suptitle(name, fontsize=14)
+  savefig( 'misc/'+str(name), fmt='png', dpi=200 )
+  return send_file('misc/'+str(name) + '.png', mimetype='image/gif')
   
 
 @app.route('/hello')
