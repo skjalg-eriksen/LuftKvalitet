@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+</head>
+
+<body>
+
+  {% for img in files: %}
+    <H3>{{img}}</H3>
+   <!-- <img src = "{{ ('static/res/' + img) }}"> <br> -->
+   <img src = "{{  url_for('static', filename=('res/'+img)) }}"> <br>
+  {% endfor %}
+</body>
+
+</html>
