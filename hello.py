@@ -98,7 +98,7 @@ def job_function():
   plt.colorbar(sc)
   name='component: ' + str(z['component'].iloc[0]) + ', date: ' + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
   #fig.suptitle(name, fontsize=14)
-  savefig('static/res/'+str(name), fmt='png', dpi=200 )
+  savefig('/'+str(name), fmt='png', dpi=200 )
 
 
 # Shutdown your cron thread if the web process is stopped
@@ -119,7 +119,7 @@ def home():
 
 @app.route('/show')
 def show():
-  names = os.listdir( os.path.join( app.static_folder, 'res'))
+  names = os.listdir( './')
   #files = url_for('static', filename=os.path.join('res', choice(names)))
   return render_template('show.html', files=names)
 
@@ -272,7 +272,7 @@ def kriging_plot():
   plt.colorbar(sc)
   name='component: ' + str(z['component'].iloc[0]) + ', date: ' + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
   #fig.suptitle(name, fontsize=14)
-  savefig('static/res/'+str(name), fmt='png', dpi=200 )
+  savefig('./'+str(name), fmt='png', dpi=200 )
   return render_template('show.html', files=names)
   
 
