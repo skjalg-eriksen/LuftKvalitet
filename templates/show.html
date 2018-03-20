@@ -6,12 +6,14 @@
 </head>
 
 <body>
-
   {% for img in files: %}
-    <H3>{{img}}</H3>
-   <!-- <img src = "{{ ('static/res/' + img) }}"> <br> -->
+  {% if img.endswith('.png'): %}
+   <H3>{{img}}</H3>
    <img src = "{{  url_for('static', filename=('res/'+img)) }}"> <br>
+  {% endif %}
   {% endfor %}
 </body>
-
 </html>
+
+
+<!-- <img src = "{{ ('static/res/' + img) }}"> <br> -->
