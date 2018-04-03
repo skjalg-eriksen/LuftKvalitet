@@ -3,17 +3,119 @@
 
 <head>
     <meta charset="utf-8">
+   
+    <link rel="stylesheet" href="https://openlayers.org/en/v4.6.5/css/ol.css" type="text/css">
+    <script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
+    <script src="{{ url_for('static', filename='./proj4js-2.4.3/dist/proj4.js')}}"></script>
+
+
+  <script type="text/javascript">
+  
+    function loadmap(){
+      
+      proj4.defs(
+  "EPSG:32632",
+  "+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+);
+var imageExtent = [
+  593065.1648494017,
+  6638524.509011956,
+  605365.439142052,
+  6648891.652304975
+];
+
+var urllink = "https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg";
+
+var myImage = new ol.layer.Image({
+  source: new ol.source.ImageStatic({
+    url: "data:image/png;base64,{{img}}",
+    projection: "EPSG:32632",
+    imageExtent: imageExtent
+  }),
+  opacity: 0.65
+});
+var view = new ol.View({
+  center: ol.proj.transform(
+    ol.extent.getCenter(imageExtent),
+    "EPSG:32632",
+    "EPSG:3857"
+  ),
+  zoom: 12
+});
+var map = new ol.Map({
+  layers: [
+    new ol.layer.Tile({
+      source: new ol.source.OSM()
+    }),
+    myImage
+  ],
+  target: "map_div",
+  loadTilesWhileAnimating: true,
+  view: view
+});
+
+    }
+    
+    
+    function detailed(){
+      if(document.getElementById("info").style.display == "inline"){
+        document.getElementById("info").style.display = "none";
+      }else{
+        document.getElementById("info").style.display = "inline";
+        }
+    }
+  </script>    
+
 </head>
 
-<body>
-  {% for img in files: %}
-  {% if img.endswith('.png'): %}
-   <H3>{{img}}</H3>
-   <img src = "{{  url_for('static', filename=('res/'+img)) }}"> <br>
-  {% endif %}
-  {% endfor %}
+<body onload="loadmap()">
+
+  <!-- select component drop down menu, if in the middle sets current component -->
+  <h3>
+    <form action="{{url_for('show_data')}}" methods=['GET']>
+      component:
+      <select name="selected_component">
+        {% for comp in components : %}
+          <option value = {{comp}} 
+          
+          {% if comp == component : %}
+            selected="selected"
+          {% endif %} 
+          > {{comp}} </option> 
+        {% endfor %}
+      </select>
+      <input type="submit">
+    </form>
+  </h3>
+  
+  
+  <!-- write out _id, date, component -->
+  image database document id: {{ _id }},  index: {{ index }}<br>
+  <h2>
+  date: {{ date }}, component: {{ component }}
+  </h2>
+  
+  <div id="map_div"></div>
+  
+  <button onclick="detailed()">show detailed image</button>
+  <img style="display: none; width: 100%" id="info" src=data:image/png;base64,{{info}}>
+  
+  <form>
+    <input type="hidden" name="index" value="{{index-1}}" >
+    <input type="hidden" name="selected_component" value="{{component}}">
+    <input type="submit" 
+    {% if (index < 1) : %}
+      disabled
+    {% endif %}
+      value="previous">
+  </form>
+  <form> 
+    <input type="hidden" name="index" value="{{index+1}}" >
+    <input type="hidden" name="selected_component" value="{{component}}">
+    <input type="submit" value="next">
+  </form>
+  
+  
 </body>
+
 </html>
-
-
-<!-- <img src = "{{ ('static/res/' + img) }}"> <br> -->

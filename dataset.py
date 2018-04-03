@@ -41,5 +41,5 @@ def data():
     # add calculated x, y to dataframe
     fdata.loc[i, 'x'] = utm.from_latlon( row['latitude'], row['longitude'] )[0] - utm.from_latlon(lat1, long1)[0];
     fdata.loc[i, 'y'] = utm.from_latlon( row['latitude'], row['longitude'] )[1] - utm.from_latlon(lat1, long1)[1];
-  fdata = fdata.drop(fdata[fdata.component != 'PM10'].index)
+  #fdata = fdata.drop(fdata[fdata.component != 'PM10'].index)
   return(fdata)

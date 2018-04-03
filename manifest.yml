@@ -2,4 +2,4 @@
 applications:
  - name: luftkvalitet
    random-route: true
-   memory: 1GB
+   memory: 2GB

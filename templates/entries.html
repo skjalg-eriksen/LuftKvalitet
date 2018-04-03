@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Luftkvalitet</title>
+    
+</head>
+
+<body>
+   {% for df in entries: %}
+     <h3>{{df['component'].iloc[0]}}</h3>
+     
+     {% for i, row in df.iterrows(): %}
+        <form action="{{url_for('show_data')}}" methods=['GET']>
+        
+           <input type="hidden" name="index" value="{{i}}" >
+           <input type="hidden" name="selected_component" value="{{df['component'].iloc[0]}}">
+           
+           index:{{i}}  date:{{df.loc[i, "date"]}} component:{{df.loc[i, "component"]}}
+          <input type="submit" value="go to">
+        </form>
+     {% endfor %}
+   {% endfor %}
+   
+</body>
+
+</html>

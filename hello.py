@@ -26,9 +26,9 @@ import utm
 
 import dataset
 from krige import SVh, SV, C, spherical, opt, cvmodel, krige
-#from mpl_toolkits.basemap import Basemap
 import datetime
-from base64 import b64encode
+import base64
+from kriging_task import krige_task;
 
 #map corners
 LEFT = 593065.1648494017; 
@@ -78,24 +78,102 @@ elif os.path.isfile('vcap-local.json'):
 @app.route('/')
 def home():
     return render_template('index.html')
-    
+
 @app.route('/db_info')
 def db_info():
   client = Cloudant(user, password, url=url, connect=True)
   db = client.create_database(db_name, throw_on_exists=False)
-  return str(db.exists())
   return ('databases: {0}'.format( client.all_dbs() ));
-  
-@app.route('/db_docs/<name>')
-def db_docs(name):
+
+
+@app.route('/show_data', methods=['GET'])
+def show_data():
+  #connect to the db
   client = Cloudant(user, password, url=url, connect=True)
   db = client.create_database(db_name, throw_on_exists=False)
   
-  img = db.all_docs().get_attachment(name, name, default=None).read()
-  img_b64 = base64.b64encode(img)
-  return render_template('testimg.html', img = img_b64)
-  #return jsonify(list(map(lambda doc: doc.get_attachment('5845e1677733c3558233c0ee.png', arrachment), db) ));
-
+  #get all docs
+  docs = list(map(lambda doc: doc, db) )
+  #put them into a dataframe
+  fdocs = json_normalize(docs);
+  fdocs = DataFrame(fdocs, columns=['date', 'component', '_id'])
+  fdocs = fdocs.reset_index(drop=True)
+  fdocs.sort_values(['date', 'component'])
+  #get the components
+  components = fdocs['component'].unique().tolist()
+  
+  #get the requested component
+  if( request.args.get('selected_component') ):
+    selected_component = request.args.get('selected_component')
+  else:
+    selected_component = "PM10"
+  
+  #drop what we dont need.
+  fdocs = fdocs.drop(fdocs[fdocs.component != selected_component].index)
+  fdocs = fdocs.sort_values(['date'], ascending=[False])
+  fdocs = fdocs.reset_index(drop=True)
+  
+  if( request.args.get('index') ):
+    i = int(request.args.get('index'))
+    print fdocs
+    selected_id = fdocs.loc[i, '_id']
+    selected_date = fdocs.loc[i, 'date']
+    
+    doc = db[ selected_id ]
+    
+    selected_img = base64.b64encode(doc.get_attachment("img"))
+    selected_info = base64.b64encode(doc.get_attachment("info"))
+  else:
+    i = 0
+    selected_id = fdocs.loc[i, '_id']
+    selected_date = fdocs.loc[i, 'date']
+    
+    doc = db[ selected_id ]
+    
+    selected_img = base64.b64encode(doc.get_attachment("img"))
+    selected_info = base64.b64encode(doc.get_attachment("info"))
+  
+  
+  return render_template('show.html', 
+  components = components,
+  index = i,
+  _id = selected_id,
+  date = selected_date,
+  component = selected_component, 
+  img = selected_img,
+  info = selected_info)
+  
+@app.route('/all_entries', methods=['GET'])
+def all_entries():
+  #connect to the db
+  client = Cloudant(user, password, url=url, connect=True)
+  db = client.create_database(db_name, throw_on_exists=False)
+  
+  #get all docs
+  docs = list(map(lambda doc: doc, db) )
+  #put them into a dataframe
+  fdocs = json_normalize(docs);
+  fdocs = DataFrame(fdocs, columns=['date', 'component', '_id'])
+  fdocs = fdocs.reset_index(drop=True)
+  fdocs.sort_values(['date', 'component'])
+  #get the components
+  components = fdocs['component'].unique().tolist();
+  
+  #make a list of same size as components
+  complist = [None]* len(components)
+  for i in range(len(components)):
+    #drop everything but relevant info
+    tmp = fdocs.drop(fdocs[fdocs.component != components[i]].index)
+    #sort them
+    tmp = tmp.sort_values(['date'], ascending=[False])
+    #re index the dataframe
+    tmp = tmp.reset_index(drop=True)
+    #put the dataframe into the list
+    complist[i] = tmp;
+ 
+    
+  return render_template('entries.html', entries = complist);
+  
 @app.route('/data_min')
 def data_min():
   # fetches data from nilu
@@ -173,129 +251,47 @@ def spherical_model_plot():
   
 @app.route('/kriging_plot')
 def kriging_plot():
-  z = dataset.data();
-  # part of our data set recording porosity
-  P = np.array( z[['x','y','value']] )
-  # bandwidth, plus or minus 250 meters
-  bw = 15500
-  # lags in 500 meter increments from zero to 10,000
-  # hs = np.arange(0,10500,bw)
-  hs = np.arange(0,20000, bw)
-  sv = SV( P, hs, bw )
-
-  X0, X1 = 0, RIGHT-LEFT
-  Y0, Y1 = 0, TOP-BOTTOM
-
-  nx = 48
-  ny = 60
-  num_points = 7
-  Z = np.zeros((ny,nx))
-  dx, dy = (X1-X0)/float(nx), (Y1-Y0)/float(ny)
-  for i in range(nx):
-      print (i),
-      for j in range(ny):
-          x = X0 + i*dx
-          y = Y0 + j*dy
-          Z[j,i] = krige( P, spherical, hs, bw, (x, y), num_points )
-
-  cdict = {'red':   ((0.0, 1.0, 1.0),
-                   (0.5, 225/255., 225/255. ),
-                   (0.75, 0.141, 0.141 ),
-                   (1.0, 0.0, 0.0)),
-         'green': ((0.0, 1.0, 1.0),
-                   (0.5, 57/255., 57/255. ),
-                   (0.75, 0.0, 0.0 ),
-                   (1.0, 0.0, 0.0)),
-         'blue':  ((0.0, 0.376, 0.376),
-                   (0.5, 198/255., 198/255. ),
-                   (0.75, 1.0, 1.0 ),
-                   (1.0, 0.0, 0.0)) }
-
-  my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-
-  fig, ax = subplots()
-  fig.dpi=400
-  H = np.zeros_like( Z )
-  for i in range( Z.shape[0] ):
-      for j in range( Z.shape[1] ):
-          H[i,j] = np.round( Z[i,j]*3 )
-          
-  #m = Basemap(llcrnrlon=10.662291,llcrnrlat= 59.873800,urcrnrlon=10.887139,urcrnrlat=59.963886,
-  #             resolution='f',projection='tmerc',lon_0=6.7806151842031,lat_0=60.479443366542, ax = ax)
-  #m.drawcoastlines()
-
-  #ax.matshow( H, cmap=my_cmap, interpolation='nearest' )
-  ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='nearest', alpha=0.7, extent=[X0, X1, Y0, Y1])
-  sc = ax.scatter( z.x, z.y, cmap=my_cmap, c=z.value, linewidths=0.75, s=50 )
-  #xlim(0,nx) ; ylim(0,ny)
-  plt.colorbar(sc)
-  name='component: ' + str(z['component'].iloc[0]) + ', date: ' + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
-  #fig.suptitle(name, fontsize=14)
-  #savefig(app.root_path+'/'+str(name), fmt='png', dpi=200 )
+  date =  str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+  data = dataset.data()
+  data.sort_values(by=['component'])
+  data.set_index(keys=['component'], drop=False,inplace=True)
+  names = data['component'].unique().tolist()
   
-  return render_template('show.html', files=names)
+  for component in names:
+    compdata = data.loc[data.component == component]
+    if(4 >len(compdata.index)):
+      continue;
+    
+    krige_task(compdata, date)
+    
+    #open files encode in base64
+    file_object_img  = open("img.png", "r");
+    file_object_img64 = base64.b64encode(file_object_img.read())
+    file_object_info  = open("info.png", "r");
+    file_object_info64 = base64.b64encode(file_object_info.read())
+    
+    #define document
+    document = {
+        'date': date, 
+        'component': str(compdata['component'].iloc[0]),
+        '_attachments': { 
+          "img" : {'data': file_object_img64},
+          "info" : {'data': file_object_info64}
+        }
+    }
+    #connect to db
+    client = Cloudant(user, password, url=url, connect=True)
+    db = client.create_database(db_name, throw_on_exists=False)
+    #store document
+    document = db.create_document(document);
+    
+  return "done.."
   
 @cron.interval_schedule(hours=3)
 def job_function():
-  print("Running kriging");
-  z = dataset.data();
-  # part of our data set recording porosity
-  P = np.array( z[['x','y','value']] )
-  # bandwidth, plus or minus 250 meters
-  bw = 15500
-  # lags in 500 meter increments from zero to 10,000
-  # hs = np.arange(0,10500,bw)
-  hs = np.arange(0,20000, bw)
-  sv = SV( P, hs, bw )
-
-
-  X0, X1 = 0, RIGHT-LEFT
-  Y0, Y1 = 0, TOP-BOTTOM
-
-
-  nx = 48
-  ny = 60
-  num_points = 7
-  Z = np.zeros((ny,nx))
-  dx, dy = (X1-X0)/float(nx), (Y1-Y0)/float(ny)
-  for i in range(nx):
-      print (i),
-      for j in range(ny):
-          x = X0 + i*dx
-          y = Y0 + j*dy
-          Z[j,i] = krige( P, spherical, hs, bw, (x, y), num_points )
-
-  cdict = {'red':   ((0.0, 1.0, 1.0),
-                   (0.5, 225/255., 225/255. ),
-                   (0.75, 0.141, 0.141 ),
-                   (1.0, 0.0, 0.0)),
-         'green': ((0.0, 1.0, 1.0),
-                   (0.5, 57/255., 57/255. ),
-                   (0.75, 0.0, 0.0 ),
-                   (1.0, 0.0, 0.0)),
-         'blue':  ((0.0, 0.376, 0.376),
-                   (0.5, 198/255., 198/255. ),
-                   (0.75, 1.0, 1.0 ),
-                   (1.0, 0.0, 0.0)) }
-
-  my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
-
-  fig, ax = subplots()
-  fig.dpi=400
-  H = np.zeros_like( Z )
-  for i in range( Z.shape[0] ):
-      for j in range( Z.shape[1] ):
-          H[i,j] = np.round( Z[i,j]*3 )
-
-  #ax.matshow( H, cmap=my_cmap, interpolation='nearest' )
-  ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='nearest', alpha=0.7, extent=[X0, X1, Y0, Y1])
-  sc = ax.scatter( z.x, z.y, cmap=my_cmap, c=z.value, linewidths=0.75, s=50 )
-  #xlim(0,nx) ; ylim(0,ny)
-  plt.colorbar(sc)
-  name='component: ' + str(z['component'].iloc[0]) + ', date: ' + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
-  #fig.suptitle(name, fontsize=14)
-  savefig(str(name), fmt='png', dpi=200 )
+  kriging_plot()
   
+
 # Shutdown your cron thread if the web process is stopped
 atexit.register(lambda: cron.shutdown(wait=False))
 atexit.register(client.disconnect())
