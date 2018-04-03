@@ -8,8 +8,10 @@
     <script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
     <script src="{{ url_for('static', filename='./proj4js-2.4.3/dist/proj4.js')}}"></script>
 
+    <link href="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.min.css')}}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.js')}}"></script>
 
-  <script type="text/javascript">
+    <script type="text/javascript">
   
     function loadmap(){
       
@@ -54,8 +56,31 @@ var map = new ol.Map({
   view: view
 });
 
+
+//Instantiate with some options and add the Control
+var geocoder = new Geocoder('nominatim', {
+  provider: 'osm',
+  lang: 'en',
+  placeholder: 'Search for ...',
+  limit: 5,
+  debug: false,
+  autoComplete: true,
+  keepOpen: true
+});
+map.addControl(geocoder);
+  
+//Listen when an address is chosen
+geocoder.on('addresschosen', function (evt) {
+	console.info(evt);
+  window.setTimeout(function () {
+    popup.show(evt.coordinate, evt.address.formatted);
+  }, 3000);
+});
     }
     
+    
+
+
     
     function detailed(){
       if(document.getElementById("info").style.display == "inline"){
