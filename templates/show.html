@@ -4,14 +4,18 @@
 <head>
     <meta charset="utf-8">
    
+
     <link rel="stylesheet" href="https://openlayers.org/en/v4.6.5/css/ol.css" type="text/css">
     <script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
     <script src="{{ url_for('static', filename='./proj4js-2.4.3/dist/proj4.js')}}"></script>
-
+    <script type=text/javascript src="{{url_for('static', filename='jquery.js') }}"></script>
+    
     <link href="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.min.css')}}" rel="stylesheet">
     <script src="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.js')}}"></script>
 
     <script type="text/javascript">
+
+    
   
     function loadmap(){
       
@@ -30,7 +34,7 @@ var urllink = "https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg"
 
 var myImage = new ol.layer.Image({
   source: new ol.source.ImageStatic({
-    url: "data:image/png;base64,{{img}}",
+    url: "{{url_for('get_img', _id=_id)}}",
     projection: "EPSG:32632",
     imageExtent: imageExtent
   }),
@@ -42,7 +46,9 @@ var view = new ol.View({
     "EPSG:32632",
     "EPSG:3857"
   ),
-  zoom: 12
+  zoom: 13,
+  minZoom: 12,
+  maxZoom: 20
 });
 var map = new ol.Map({
   layers: [
@@ -55,6 +61,70 @@ var map = new ol.Map({
   loadTilesWhileAnimating: true,
   view: view
 });
+
+var geolocation = new ol.Geolocation({
+  projection: view.getProjection()
+});
+function el(id) {
+  return document.getElementById(id);
+}
+
+el('track').addEventListener('change', function() {
+  geolocation.setTracking(this.checked);
+});
+
+// update the HTML page when the position changes.
+geolocation.on('change', function() {
+  el('accuracy').innerText = geolocation.getAccuracy() + ' [m]';
+  el('altitude').innerText = geolocation.getAltitude() + ' [m]';
+  el('altitudeAccuracy').innerText = geolocation.getAltitudeAccuracy() + ' [m]';
+  el('heading').innerText = geolocation.getHeading() + ' [rad]';
+  el('speed').innerText = geolocation.getSpeed() + ' [m/s]';
+  updateView();
+});
+
+// handle geolocation error.
+geolocation.on('error', function(error) {
+  var info = document.getElementById('info');
+  info.innerHTML = error.message;
+  info.style.display = '';
+});
+
+var accuracyFeature = new ol.Feature();
+geolocation.on('change:accuracyGeometry', function() {
+  accuracyFeature.setGeometry(geolocation.getAccuracyGeometry());
+});
+
+var positionFeature = new ol.Feature();
+positionFeature.setStyle(new ol.style.Style({
+  image: new ol.style.Circle({
+    radius: 6,
+    fill: new ol.style.Fill({
+      color: '#3399CC'
+    }),
+    stroke: new ol.style.Stroke({
+      color: '#fff',
+      width: 2
+    })
+  })
+}));
+
+geolocation.on('change:position', function() {
+  var coordinates = geolocation.getPosition();
+  positionFeature.setGeometry(coordinates ?
+    new ol.geom.Point(coordinates) : null);
+});
+new ol.layer.Vector({
+  map: map,
+  source: new ol.source.Vector({
+    features: [accuracyFeature, positionFeature]
+  })
+});
+
+//Centers the view to where the geolocation is
+function updateView() {
+  view.setCenter(geolocation.getPosition());
+}
 
 
 //Instantiate with some options and add the Control
@@ -73,9 +143,11 @@ map.addControl(geocoder);
 geocoder.on('addresschosen', function (evt) {
 	console.info(evt);
   window.setTimeout(function () {
-    popup.show(evt.coordinate, evt.address.formatted);
+    //popup.show(evt.coordinate, evt.address.formatted);
   }, 3000);
 });
+
+
     }
     
     
@@ -89,7 +161,29 @@ geocoder.on('addresschosen', function (evt) {
         document.getElementById("info").style.display = "inline";
         }
     }
+    
   </script>    
+  
+  
+  
+  <script type=text/javascript>
+    $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+  
+    $images_to_load = $(
+    {% for i, row in fdocs.iterrows(): %}
+      {%if i > 0 :%}
+      {{','}}
+      {% endif %}
+      '{{fdocs.loc[i, '_id']}}'
+    {% endfor %})
+    
+    for (var i = 0; i < $images_to_load.length-1; i++)
+      $.get($SCRIPT_ROOT + '/img/' + $images_to_load[i] , function(data, status){
+          document.write( "<img width: 100% src=" + data  +"> );
+      }); 
+    }
+    
+  </script>
 
 </head>
 
@@ -98,7 +192,7 @@ geocoder.on('addresschosen', function (evt) {
   <!-- select component drop down menu, if in the middle sets current component -->
   <h3>
     <form action="{{url_for('show_data')}}" methods=['GET']>
-      component:
+      Component:
       <select name="selected_component">
         {% for comp in components : %}
           <option value = {{comp}} 
@@ -112,20 +206,10 @@ geocoder.on('addresschosen', function (evt) {
       <input type="submit">
     </form>
   </h3>
-  
-  
-  <!-- write out _id, date, component -->
-  image database document id: {{ _id }},  index: {{ index }}<br>
-  <h2>
-  date: {{ date }}, component: {{ component }}
-  </h2>
-  
-  <div id="map_div"></div>
-  
-  <button onclick="detailed()">show detailed image</button>
-  <img style="display: none; width: 100%" id="info" src=data:image/png;base64,{{info}}>
-  
-  <form>
+
+
+  <p>
+  <form style="display: inline;">
     <input type="hidden" name="index" value="{{index-1}}" >
     <input type="hidden" name="selected_component" value="{{component}}">
     <input type="submit" 
@@ -134,11 +218,38 @@ geocoder.on('addresschosen', function (evt) {
     {% endif %}
       value="previous">
   </form>
-  <form> 
+  <form style="display: inline;"> 
     <input type="hidden" name="index" value="{{index+1}}" >
     <input type="hidden" name="selected_component" value="{{component}}">
-    <input type="submit" value="next">
+    <input type="submit"
+    {% if index == fdocs.index|length -1: %}
+      disabled
+    {% endif %}
+     value="next">
   </form>
+  entries: {{fdocs.index|length}}
+  <button id="FindMe" title="Find me" onclick="updateView()">Find me!</button>
+  </p>
+  <label for="track">
+  Track position
+  <input id="track" type="checkbox"/>
+  position accuracy : <code id="accuracy"></code>&nbsp;&nbsp;
+  altitude : <code id="altitude"></code>&nbsp;&nbsp;
+  altitude accuracy : <code id="altitudeAccuracy"></code>&nbsp;&nbsp;
+  heading : <code id="heading"></code>&nbsp;&nbsp;
+  speed : <code id="speed"></code>
+  </label>
+  <p></p>
+  <!-- write out _id, date, component -->
+  image database document id: {{ _id }},  index: {{ index }}<br>
+  <h2>
+  date: {{ date }}, component: {{ component }}
+  </h2>
+  
+  <div id="map_div"></div>
+
+  <button onclick="detailed()">show detailed image</button>
+  <img style="display: none; width: 100%" id="info" src={{url_for('get_info', _id=_id)}}>
   
   
 </body>

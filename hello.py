@@ -10,13 +10,16 @@ import cf_deployment_tracker
 import os
 import json
 import math
-
+import re
+import simplejson
+import io
+from PIL import Image
 
 import atexit
 from apscheduler.scheduler import Scheduler
 
 import numpy as np
-from pandas.io.json import json_normalize
+from pandas.io.json import json_normalize, read_json
 from pylab import *
 import numpy as np
 from pandas import DataFrame, Series
@@ -79,12 +82,89 @@ elif os.path.isfile('vcap-local.json'):
 def home():
     return render_template('index.html')
 
-@app.route('/db_info')
-def db_info():
-  client = Cloudant(user, password, url=url, connect=True)
-  db = client.create_database(db_name, throw_on_exists=False)
-  return ('databases: {0}'.format( client.all_dbs() ));
 
+@app.route('/img/<_id>')
+def get_img(_id):
+    cdict = {'red':   ((0.0, 1.0, 1.0),
+                   (0.5, 225/255., 225/255. ),
+                   (0.75, 0.141, 0.141 ),
+                   (1.0, 0.0, 0.0)),
+         'green': ((0.0, 1.0, 1.0),
+                   (0.5, 57/255., 57/255. ),
+                   (0.75, 0.0, 0.0 ),
+                   (1.0, 0.0, 0.0)),
+         'blue':  ((0.0, 0.376, 0.376),
+                   (0.5, 198/255., 198/255. ),
+                   (0.75, 1.0, 1.0 ),
+                   (1.0, 0.0, 0.0)) }
+    my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
+    
+    X0, X1 = 0, RIGHT-LEFT
+    Y0, Y1 = 0, TOP-BOTTOM
+
+    #connect to the db
+    client = Cloudant(user, password, url=url, connect=True)
+    db = client.create_database(db_name, throw_on_exists=False)
+    #get the document from the db
+    doc = db[ _id ]
+    H = simplejson.loads(doc['krige_data'])
+    buffr = io.BytesIO()
+    
+    fig, ax = subplots()
+    ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='gaussian', alpha=0.7, extent=[X0, X1, Y0, Y1])
+    ax.axis('off')
+    fig.dpi=400
+
+    fig.set_size_inches(5.95, 5)
+    imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
+    buffr.seek(0)
+    
+    return send_file(buffr, mimetype='image/png')
+    
+
+@app.route('/info/<_id>')
+def get_info(_id):
+    cdict = {'red':   ((0.0, 1.0, 1.0),
+                   (0.5, 225/255., 225/255. ),
+                   (0.75, 0.141, 0.141 ),
+                   (1.0, 0.0, 0.0)),
+         'green': ((0.0, 1.0, 1.0),
+                   (0.5, 57/255., 57/255. ),
+                   (0.75, 0.0, 0.0 ),
+                   (1.0, 0.0, 0.0)),
+         'blue':  ((0.0, 0.376, 0.376),
+                   (0.5, 198/255., 198/255. ),
+                   (0.75, 1.0, 1.0 ),
+                   (1.0, 0.0, 0.0)) }
+    my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
+    
+    X0, X1 = 0, RIGHT-LEFT
+    Y0, Y1 = 0, TOP-BOTTOM
+
+    #connect to the db
+    client = Cloudant(user, password, url=url, connect=True)
+    db = client.create_database(db_name, throw_on_exists=False)
+    #get the document from the db
+    doc = db[ _id ]
+    H = simplejson.loads(doc['krige_data'])
+    z = read_json(doc['data'], orient='index')
+    date = doc['date']
+    
+    buffr = io.BytesIO()
+    fig, ax = subplots()    
+    fig.dpi=400
+    ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='nearest', alpha=0.7, extent=[X0, X1, Y0, Y1])
+
+    sc = ax.scatter( z.x, z.y, cmap=my_cmap, c=z.value, linewidths=0.75, s=50 )
+    plt.colorbar(sc)
+
+    fig.suptitle('component: ' + str(z['component'].iloc[0]) + ', date: ' + str(date), fontsize=14)
+    fig.savefig(buffr, dpi = 400)
+    
+    buffr.seek(0)
+    
+    return send_file(buffr, mimetype='image/png')
 
 @app.route('/show_data', methods=['GET'])
 def show_data():
@@ -115,23 +195,13 @@ def show_data():
   
   if( request.args.get('index') ):
     i = int(request.args.get('index'))
-    print fdocs
     selected_id = fdocs.loc[i, '_id']
     selected_date = fdocs.loc[i, 'date']
     
-    doc = db[ selected_id ]
-    
-    selected_img = base64.b64encode(doc.get_attachment("img"))
-    selected_info = base64.b64encode(doc.get_attachment("info"))
   else:
     i = 0
     selected_id = fdocs.loc[i, '_id']
     selected_date = fdocs.loc[i, 'date']
-    
-    doc = db[ selected_id ]
-    
-    selected_img = base64.b64encode(doc.get_attachment("img"))
-    selected_info = base64.b64encode(doc.get_attachment("info"))
   
   
   return render_template('show.html', 
@@ -139,9 +209,8 @@ def show_data():
   index = i,
   _id = selected_id,
   date = selected_date,
-  component = selected_component, 
-  img = selected_img,
-  info = selected_info)
+  component = selected_component,
+  fdocs = fdocs)
   
 @app.route('/all_entries', methods=['GET'])
 def all_entries():
@@ -254,7 +323,7 @@ def kriging_plot():
   date =  str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
   data = dataset.data()
   data.sort_values(by=['component'])
-  data.set_index(keys=['component'], drop=False,inplace=True)
+  #data.set_index(keys=['component'], drop=False,inplace=True)
   names = data['component'].unique().tolist()
   
   for component in names:
@@ -262,22 +331,14 @@ def kriging_plot():
     if(4 >len(compdata.index)):
       continue;
     
-    krige_task(compdata, date)
-    
-    #open files encode in base64
-    file_object_img  = open("img.png", "r");
-    file_object_img64 = base64.b64encode(file_object_img.read())
-    file_object_info  = open("info.png", "r");
-    file_object_info64 = base64.b64encode(file_object_info.read())
+    krige_data = krige_task(compdata, date)
     
     #define document
     document = {
         'date': date, 
         'component': str(compdata['component'].iloc[0]),
-        '_attachments': { 
-          "img" : {'data': file_object_img64},
-          "info" : {'data': file_object_info64}
-        }
+        'data' : compdata.to_json(orient='index'),
+        'krige_data' : simplejson.dumps(krige_data.tolist())
     }
     #connect to db
     client = Cloudant(user, password, url=url, connect=True)

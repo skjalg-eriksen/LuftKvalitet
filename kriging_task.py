@@ -84,9 +84,10 @@ def krige_task(data, date):
   H = np.zeros_like( Z )
   for i in range( Z.shape[0] ):
       for j in range( Z.shape[1] ):
-          H[i,j] = np.round( Z[i,j]*3 )
+          H[i,j] = np.round( Z[i,j]*20 )
 
-
+  return H;
+  
   #image with info
   fig, ax = subplots()    
   fig.dpi=400
