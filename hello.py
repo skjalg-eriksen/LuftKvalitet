@@ -13,7 +13,6 @@ import math
 import re
 import simplejson
 import io
-from PIL import Image
 
 import atexit
 from apscheduler.scheduler import Scheduler
@@ -77,27 +76,32 @@ elif os.path.isfile('vcap-local.json'):
         client = Cloudant(user, password, url=url, connect=True)
         db = client.create_database(db_name, throw_on_exists=False)
         
+        
+#Green, yellow, orange, red;
+cdict = {'red':   ((0.0, 0.0, 0.0),
+                   (0.35, 1.0, 1.0),   
+                   (0.4, 1.0, 1.0),   
+                   (0.8, 1.0, 1.0),  
+                   (1.0, 2.0, 0.0)), 
+
+         'green': ((0.0,  1.0, 1.0), 
+                   (0.5,  1.0, 1.0),
+                   (1.0,  0.0, 0.0)),
+
+         'blue':  ((0.0, 0.0, 0.0),
+                   (0.1, 0.0, 0.0),  
+                   (0.4, 0.0, 0.0),  
+                   (1.0, 0.0, 0.0))  
+          }
+my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)   
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
 
-@app.route('/img/<_id>')
+@app.route('/img/<_id>', methods=['GET', 'POST'])
 def get_img(_id):
-    cdict = {'red':   ((0.0, 1.0, 1.0),
-                   (0.5, 225/255., 225/255. ),
-                   (0.75, 0.141, 0.141 ),
-                   (1.0, 0.0, 0.0)),
-         'green': ((0.0, 1.0, 1.0),
-                   (0.5, 57/255., 57/255. ),
-                   (0.75, 0.0, 0.0 ),
-                   (1.0, 0.0, 0.0)),
-         'blue':  ((0.0, 0.376, 0.376),
-                   (0.5, 198/255., 198/255. ),
-                   (0.75, 1.0, 1.0 ),
-                   (1.0, 0.0, 0.0)) }
-    my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
     
     X0, X1 = 0, RIGHT-LEFT
     Y0, Y1 = 0, TOP-BOTTOM
@@ -121,23 +125,37 @@ def get_img(_id):
     buffr.seek(0)
     
     return send_file(buffr, mimetype='image/png')
+
+
+@app.route('/get/<_id>', methods=['GET'])
+def get_image(_id):
     
+    
+    X0, X1 = 0, RIGHT-LEFT
+    Y0, Y1 = 0, TOP-BOTTOM
+
+    #connect to the db
+    client = Cloudant(user, password, url=url, connect=True)
+    db = client.create_database(db_name, throw_on_exists=False)
+    #get the document from the db
+    doc = db[ _id ]
+    H = simplejson.loads(doc['krige_data'])
+    buffr = io.BytesIO()
+    
+    fig, ax = subplots()
+    ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='gaussian', alpha=0.7, extent=[X0, X1, Y0, Y1])
+    ax.axis('off')
+    fig.dpi=400
+
+    fig.set_size_inches(5.95, 5)
+    imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
+    buffr.seek(0)
+    
+    return send_file(buffr, mimetype='image/png')
 
 @app.route('/info/<_id>')
 def get_info(_id):
-    cdict = {'red':   ((0.0, 1.0, 1.0),
-                   (0.5, 225/255., 225/255. ),
-                   (0.75, 0.141, 0.141 ),
-                   (1.0, 0.0, 0.0)),
-         'green': ((0.0, 1.0, 1.0),
-                   (0.5, 57/255., 57/255. ),
-                   (0.75, 0.0, 0.0 ),
-                   (1.0, 0.0, 0.0)),
-         'blue':  ((0.0, 0.376, 0.376),
-                   (0.5, 198/255., 198/255. ),
-                   (0.75, 1.0, 1.0 ),
-                   (1.0, 0.0, 0.0)) }
-    my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
     
     X0, X1 = 0, RIGHT-LEFT
     Y0, Y1 = 0, TOP-BOTTOM

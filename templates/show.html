@@ -12,50 +12,85 @@
     
     <link href="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.min.css')}}" rel="stylesheet">
     <script src="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.js')}}"></script>
+  
+  <script>
+    var index = 0;
+  </script>
 
-    <script type="text/javascript">
-
+  <script type=text/javascript>
+  
+    var loaded = new Array; 
+  
+    function load(){
+      
+      {% for i, row in fdocs.iterrows(): %}        
+        $.get( '/img/' + '{{fdocs.loc[i, '_id']}}' , function(data, status) {
+          console.log("{{i}}    {{fdocs.loc[i, '_id']}}");
+          window.loaded[{{i}}] = new Image();
+          window.loaded[{{i}}].src = '/img/' + '{{fdocs.loc[i, '_id']}}';
+          
+          {% if i == 0 %}
+            loadmap();
+          {% endif %}
+        });
+      {% endfor %}
+      
+    console.log(window.loaded[1])
+    }
     
+  </script>
+  
+  
+  <script type="text/javascript">
+  
+   
+    var mapImage;
+
+    var imageExtent;
   
     function loadmap(){
       
+      window.imageExtent = [
+        593065.1648494017,
+        6638524.509011956,
+        605365.439142052,
+        6648891.652304975
+      ];
+      
+      window.mapImage = new ol.layer.Image({
+      source: new ol.source.ImageStatic({
+        url: '{{url_for('get_img', _id=fdocs.loc[0, '_id']) }}',
+        projection: "EPSG:32632",
+        imageExtent: window.imageExtent
+      }),
+      opacity: 0.65
+    });
+      
       proj4.defs(
-  "EPSG:32632",
-  "+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
-);
-var imageExtent = [
-  593065.1648494017,
-  6638524.509011956,
-  605365.439142052,
-  6648891.652304975
-];
+        "EPSG:32632",
+        "+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+      );
+      
 
-var urllink = "https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg";
 
-var myImage = new ol.layer.Image({
-  source: new ol.source.ImageStatic({
-    url: "{{url_for('get_img', _id=_id)}}",
-    projection: "EPSG:32632",
-    imageExtent: imageExtent
-  }),
-  opacity: 0.65
-});
+
+
 var view = new ol.View({
   center: ol.proj.transform(
-    ol.extent.getCenter(imageExtent),
+    ol.extent.getCenter(window.imageExtent),
     "EPSG:32632",
     "EPSG:3857"
   ),
   zoom: 13,
   minZoom: 12,
-  maxZoom: 20
+  maxZoom: 21
 });
 var map = new ol.Map({
   layers: [
     new ol.layer.Tile({
       source: new ol.source.OSM()
     }),
-    myImage
+    window.mapImage
   ],
   target: "map_div",
   loadTilesWhileAnimating: true,
@@ -146,48 +181,76 @@ geocoder.on('addresschosen', function (evt) {
     //popup.show(evt.coordinate, evt.address.formatted);
   }, 3000);
 });
+  
 
 
     }
     
-    
-
-
-    
+  </script>   
+  
+   
+  <script type=text/javascript>
+   
     function detailed(){
-      if(document.getElementById("info").style.display == "inline"){
-        document.getElementById("info").style.display = "none";
+      if(document.getElementById("info_").style.display == "inline"){
+        document.getElementById("info_").style.display = "none";
       }else{
-        document.getElementById("info").style.display = "inline";
+        document.getElementById("info_").style.display = "inline";
         }
     }
-    
-  </script>    
+  </script>
   
   
+
   
-  <script type=text/javascript>
-    $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
-  
-    $images_to_load = $(
-    {% for i, row in fdocs.iterrows(): %}
-      {%if i > 0 :%}
-      {{','}}
-      {% endif %}
-      '{{fdocs.loc[i, '_id']}}'
-    {% endfor %})
-    
-    for (var i = 0; i < $images_to_load.length-1; i++)
-      $.get($SCRIPT_ROOT + '/img/' + $images_to_load[i] , function(data, status){
-          document.write( "<img width: 100% src=" + data  +"> );
-      }); 
+  <script>
+    function next(){
+      if ( window.index < loaded.length ){
+        window.index += 1;
+        console.log( window.loaded[window.index] );
+        
+        var nextimg = new ol.source.ImageStatic({
+          url: window.loaded[window.index].src,
+          projection: "EPSG:32632",
+          imageExtent: window.imageExtent
+        });
+        window.mapImage.setSource(nextimg);
+        
+        //document.body.appendChild( window.loaded[window.index] );
+        console.log(window.index);
+        }else {
+        console.log("index no index higher", window.index);
+      }
     }
     
+    function previous(){
+      if ( window.index > 0 ){
+        index -= 1;
+        console.log( window.loaded[window.index] );
+        
+        var nextimg = new ol.source.ImageStatic({
+          url: window.loaded[window.index].src,
+          projection: "EPSG:32632",
+          imageExtent: window.imageExtent
+        });
+        window.mapImage.setSource(nextimg);
+        console.log(window.index);
+      }else {
+        console.log("index no index lower than ", window.index);
+      }
+    }
   </script>
+  
+
 
 </head>
 
-<body onload="loadmap()">
+<body onload="load()">
+
+  <Button onclick="previous()">javascript previous</Button>
+  ..
+  <Button onclick="next()">javascript next</Button>
+
 
   <!-- select component drop down menu, if in the middle sets current component -->
   <h3>
@@ -249,9 +312,12 @@ geocoder.on('addresschosen', function (evt) {
   <div id="map_div"></div>
 
   <button onclick="detailed()">show detailed image</button>
-  <img style="display: none; width: 100%" id="info" src={{url_for('get_info', _id=_id)}}>
-  
-  
+  <img style="display: none; width: 100%" id="info_" src={{url_for('get_info', _id=_id)}}>
+   
+   
+   
+   <button onclick="load()">test preload</button>
+   <img id="test"  >
 </body>
 
 </html>
