@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+   
+
+    <link rel="stylesheet" href="https://openlayers.org/en/v4.6.5/css/ol.css" type="text/css">
+    <script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
+    <script src="{{ url_for('static', filename='./proj4js-2.4.3/dist/proj4.js')}}"></script>
+    <script type=text/javascript src="{{url_for('static', filename='jquery.js') }}"></script>
+    
+    <link href="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.min.css')}}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.js')}}"></script>
+	
+	<script src="{{ url_for('static', filename='./dataframe-js/dist/dataframe.js')}}"></script>
+  
+    
+  
+
+  <script>
+  
+    //display index
+    var display_index = 0;
+    function getDisplay_index(){
+      return display_index;
+    }
+    function operateDisplay_index( a ){
+      display_index = display_index + a;
+    }
+    function resetDisplay_index(){
+      display_index = 0;
+    }
+    
+    
+    //range funcs
+    function getRange() {
+      return document.getElementById("load_range").value; 
+    }
+    
+    function updateRange(){
+      load_for();
+      resetDisplay_index();
+    }
+    
+    var loaded = 0;
+    function incrementLoaded(){
+      loaded++;
+      if (loaded == getRange()*2){
+        console.log("finished loading");
+        
+      }
+    }
+    function resetLoaded(){
+      loaded = 0;
+    }
+    
+  </script>
+  
+  <script type="text/javascript">
+    var mapImage;
+    var contourImage;
+    var imageExtent;
+  
+    function loadmap(){
+      
+      window.imageExtent = [
+        593065.1648494017,
+        6638524.509011956,
+        605365.439142052,
+        6648891.652304975
+      ];
+      
+      window.mapImage = new ol.layer.Image({
+      source: new ol.source.ImageStatic({
+        url: '{{url_for('get_img', _id= entries[0].loc[0, '_id']) }}',
+        projection: "EPSG:32632",
+        imageExtent: window.imageExtent
+      }),
+      opacity: 0.65
+    });
+    
+    //contourplot
+    window.contourImage = new ol.layer.Image({
+      source: new ol.source.ImageStatic({
+        url: '',
+        projection: "EPSG:32632",
+        imageExtent: imageExtent
+      }),
+      opacity: 0.85
+    });
+    
+    var vectorSource = new ol.source.Vector(),
+    vectorLayer = new ol.layer.Vector({
+      source: vectorSource
+    });
+      
+      proj4.defs(
+        "EPSG:32632",
+        "+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+      );
+      
+
+
+
+
+var view = new ol.View({
+  center: ol.proj.transform(
+    ol.extent.getCenter(window.imageExtent),
+    "EPSG:32632",
+    "EPSG:3857"
+  ),
+  zoom: 13,
+  minZoom: 11,
+  maxZoom: 21
+});
+var map = new ol.Map({
+  controls: ol.control.defaults().extend([
+    new ol.control.FullScreen()
+  ]),
+  interactions: ol.interaction.defaults().extend([
+    new ol.interaction.DragRotateAndZoom()
+  ]),
+  layers: [
+    new ol.layer.Tile({
+      source: new ol.source.OSM()
+    }),
+    window.mapImage,
+    window.contourImage,
+    vectorLayer
+  ],
+  target: "map_div",
+  loadTilesWhileAnimating: true,
+  view: view
+});
+
+var geolocation = new ol.Geolocation({
+  projection: view.getProjection()
+});
+function el(id) {
+  return document.getElementById(id);
+}
+
+el('track').addEventListener('change', function() {
+  geolocation.setTracking(this.checked);
+});
+
+// update the HTML page when the position changes.
+geolocation.on('change', function() {
+  el('accuracy').innerText = geolocation.getAccuracy() + ' [m]';
+  el('altitude').innerText = geolocation.getAltitude() + ' [m]';
+  el('altitudeAccuracy').innerText = geolocation.getAltitudeAccuracy() + ' [m]';
+  el('heading').innerText = geolocation.getHeading() + ' [rad]';
+  el('speed').innerText = geolocation.getSpeed() + ' [m/s]';
+  updateView();
+});
+
+// handle geolocation error.
+geolocation.on('error', function(error) {
+  var info = document.getElementById('info');
+  info.innerHTML = error.message;
+  info.style.display = '';
+});
+
+var accuracyFeature = new ol.Feature();
+geolocation.on('change:accuracyGeometry', function() {
+  accuracyFeature.setGeometry(geolocation.getAccuracyGeometry());
+});
+
+var positionFeature = new ol.Feature();
+positionFeature.setStyle(new ol.style.Style({
+  image: new ol.style.Circle({
+    radius: 6,
+    fill: new ol.style.Fill({
+      color: '#3399CC'
+    }),
+    stroke: new ol.style.Stroke({
+      color: '#fff',
+      width: 2
+    })
+  })
+}));
+
+geolocation.on('change:position', function() {
+  var coordinates = geolocation.getPosition();
+  positionFeature.setGeometry(coordinates ?
+    new ol.geom.Point(coordinates) : null);
+});
+new ol.layer.Vector({
+  map: map,
+  source: new ol.source.Vector({
+    features: [accuracyFeature, positionFeature]
+  })
+});
+
+//Centers the view to where the geolocation is
+function updateView() {
+  view.setCenter(geolocation.getPosition());
+}
+
+
+//Instantiate with some options and add the Control
+var geocoder = new Geocoder('nominatim', {
+  provider: 'osm',
+  lang: 'en',
+  countrycodes : 'no',
+  placeholder: 'Search for ...',
+  featureStyle: '',
+  limit: 5,
+  debug: false,
+  autoComplete: true,
+  keepOpen: true
+});
+map.addControl(geocoder);
+  
+//Listen when an address is chosen
+geocoder.on('addresschosen', function (evt) {
+	console.info(evt);
+  window.setTimeout(function () {
+    //popup.show(evt.coordinate, evt.address.formatted);
+  }, 3000);
+});
+  
+
+
+    
+var longs = [10.724470, 10.833630, 10.704070, 10.765730, 10.798030];
+var lats  = [59.932330, 59.9211, 59.911320, 59.922950, 59.941030];
+
+var iconStyle = new ol.style.Style({
+    image: new ol.style.Icon({
+        anchorXUnits: 'fraction',
+        anchorYUnits: 'pixels',
+        opacity: 1,
+        scale: 0.3,
+        src: 'https://puu.sh/Ac0Pw/939d76316a.png'
+    }),
+    text: new ol.style.Text({
+        font: '19px Calibri,sans-serif',
+        fill: new ol.style.Fill({ color: '#000' }),
+        stroke: new ol.style.Stroke({
+            color: '#fff', width: 2
+        }),
+        //text: 'Omega LuL'
+    })
+});
+
+
+for (i = 0; i <longs.length; i++) {
+  var pos = ol.proj.fromLonLat([longs[i], lats[i]]);
+  var feature = new ol.Feature(
+        new ol.geom.Point(pos)
+    );
+    feature.setStyle(iconStyle);
+    vectorSource.addFeature(feature);
+}
+    
+    }
+    
+  </script>  
+ 
+    <script>
+    function colapse(){
+     if(document.getElementById("tracking").style.display == "inline"){
+        document.getElementById("tracking").style.display = "none";
+      }else{
+        document.getElementById("tracking").style.display = "inline";
+        }
+    }
+  </script>
+<script>
+      var DataFrame = dfjs.DataFrame;
+      
+      const datafrm = [];
+      {% for df in entries: %}
+        datafrm[{{loop.index0}}] = new DataFrame(
+        {
+          column1:[
+            {% for i, row in df.iterrows(): %}
+              {%if i > 0 :%}
+                {{','}}
+              {% endif %}
+              '{{row['date']}}'
+            {% endfor %}
+          ],
+          column2:[
+            {% for i, row in df.iterrows(): %}
+              {%if i > 0 :%}
+                {{','}}
+              {% endif %}
+              '{{row['component']}}'
+            {% endfor %}
+          ],
+          column3:[
+            {% for i, row in df.iterrows(): %}
+              {%if i > 0 :%}
+                {{','}}
+              {% endif %}
+                {% set sub_df = data[ row['data'] ] %}
+                new DataFrame({
+                    column1: [
+                      {% for i, row in sub_df.iterrows(): %}
+                        {%if i > 0 :%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['component']}}'
+                      {% endfor %}
+                    ],
+                    column2: [
+                      {% for i, row in data[ row['data'] ].iterrows(): %}
+                        {%if i >  0:%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['latitude']}}'
+                      {% endfor %}
+                    ],
+                    column3: [
+                      {% for i, row in data[ row['data'] ].iterrows(): %}
+                        {%if i > 0 :%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['longitude']}}'
+                      {% endfor %}
+                    ],
+                    column4: [
+                      {% for i, row in data[ row['data'] ].iterrows(): %}
+                        {%if i > 0 :%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['toTime']}}'
+                      {% endfor %}
+                    ],
+                    column5: [
+                      {% for i, row in data[ row['data'] ].iterrows(): %}
+                        {%if i > 0 :%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['unit']}}'
+                      {% endfor %}
+                    ],
+                    column6: [
+                      {% for i, row in data[ row['data'] ].iterrows(): %}
+                        {%if i > 0 :%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['value']}}'
+                      {% endfor %}
+                    ],
+                    column7: [
+                      {% for i, row in data[ row['data'] ].iterrows(): %}
+                        {%if i > 0 :%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['x']}}'
+                      {% endfor %}
+                    ],
+                    column8: [
+                      {% for i, row in data[ row['data'] ].iterrows(): %}
+                        {%if i > 0 :%}
+                          {{','}}
+                        {% endif %}
+                        '{{row['y']}}'
+                      {% endfor %}
+                    ]
+                }, ['component',	'latitude',	'longitude',	'toTime',	'unit',	'value',	'x',	'y'])
+              {% endfor %}
+          ],
+          colum4:[
+            {% for i, row in df.iterrows(): %}
+              {%if i > 0 :%}
+                {{','}}
+              {% endif %}
+              '{{row['_id']}}'
+            {% endfor %}
+          ],
+          colum5:[
+            {% for i, row in df.iterrows(): %}
+              {%if i > 0 :%}
+                {{','}}
+              {% endif %}
+              '{{i}}'
+            {% endfor %}
+          ],
+          colum6:[],
+          colum7:[]
+        },
+        ['date', 'component', 'data', '_id', 'index', 'img', 'contour']);
+        datafrm[{{loop.index0}}].show(50);
+      {% endfor %}
+      
+      function testdataframe(){
+        //lat, long
+        //return dataframe [value value] [date date]
+        var his = getHistory(59.9211, 10.83363); //first station at index 0 in NO2
+        his.show(50);
+        //| NO2       | 59.9211   | 10.83363  | 2018-0... | µg/m³     | 7.9137.
+      }
+      
+      function getDataframeIndex(){
+        return document.getElementById("component").value;
+      }
+      
+      function getDataframe(){
+        return datafrm[getDataframeIndex()];
+      }
+      
+      function getRow(i){
+        return datafrm[getDataframeIndex()].find(row => row.get('index') == i);
+      }
+      
+      function changeRowValue (index, column, value){
+        var new_row = datafrm[getDataframeIndex()].find(row => row.get('index') == index);
+        new_row = new_row.set(column, value);
+        
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].transpose();
+        
+        for(var i = 0; i < datafrm[getDataframeIndex()].listColumns().length; i++){
+          if (i == index){
+            datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].drop(String(i));
+          }
+        }
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].transpose();
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].renameAll(['date', 'component', 'data', '_id', 'index', 'img', 'contour']);
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].push(new_row);
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].sortBy('date', true);
+      }
+      
+      function changeRowValue_id (id, column, value){
+        var new_row = datafrm[getDataframeIndex()].find(row => row.get('_id') == id);
+        new_row = new_row.set(column, value);
+      
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].transpose();
+        
+        for(var i = 0; i < datafrm[getDataframeIndex()].listColumns().length; i++){
+          if (i == new_row.get('index') ){
+            datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].drop(String(i));
+          }
+        }
+
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].transpose();
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].renameAll(['date', 'component', 'data', '_id', 'index', 'img', 'contour']);
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].push(new_row);
+        datafrm[getDataframeIndex()] = datafrm[getDataframeIndex()].sortBy('date', true);
+      }
+      
+      function getHistory(latitude, longitude){
+        var dataframe = getDataframe();
+        var history = new DataFrame(
+          {
+            column1:[],
+            colum2:[],
+            column3:[],
+            colum4:[]
+          }, ['date', 'component',  'value', 'unit']);
+        
+        for (var i = 0; i < dataframe.count(); i++){
+          var station = getRow(i).get('data');
+          station = station.find(row => row.get('latitude') == latitude && row.get('longitude') == longitude);
+          //console.log(station.get('value'));
+          
+          history = history.push( [station.get('toTime'), station.get('component'), station.get('value'), station.get('unit')] );
+        }
+      
+        return history;
+      }
+      
+      </script>
+      
+      <script>
+        function start(){
+          loadmap();
+          load_for();
+        }
+       
+        function load(id){
+         $.get( '/img/' + id , function(data, status) {
+            console.log(i, status);
+          }).done(function() {
+            //when the request has finished:
+            
+            var img = new Image();
+            img.src = '/img/' + id;
+            img.title = id;
+            
+            changeRowValue_id(id, 'img', img);
+            incrementLoaded();
+            console.log( id, "finished loading img svg, loading next image...");
+          }).fail(function() {
+            //when the request has failed:
+            console.error( id, "loading contour failed for", id);
+          });
+          
+          $.get( '/contour/' + id , function(data, status) {
+            console.log(id, status);
+          }).done(function() {
+            //when the request has finished:
+            var contour = new Image();
+            contour.src = '/contour/' + id;
+            contour.title = id;
+            
+            changeRowValue_id(id, 'contour', contour);
+            incrementLoaded();
+            console.log( id, "finished loading contour png, loading next image...");
+          }).fail(function() {
+            //when the request has failed:
+            console.error( "loading contour failed for", id);
+          });
+          
+          
+        }
+        
+        function load_for(){
+          //range of indexes to preload
+          var range = getRange();
+          //reset load counter
+          resetLoaded();
+          
+          var dataframe = getDataframe();
+          var dataArray = dataframe.toArray();
+          for(var i = 0; i < range; i++){
+            if(dataArray[i][5] == null){
+              console.log( "id is", dataArray[i][3], " preloading..");
+              load( dataArray[i][3] );
+            } else {
+              incrementLoaded();incrementLoaded();
+              console.log("not loading this ", i, dataArray[i][5], dataArray[i][6]);
+            }
+          }
+        }
+        
+        function next(){
+          var range = getRange()-1;
+          if ( getDisplay_index() < range ){
+            operateDisplay_index(1);
+            
+            row = getRow( getDisplay_index() );
+            console.log(getDisplay_index());
+            var data = row.get('data');
+            data.show();
+          }
+        }
+        function previous(){
+          var range = getRange()-1;
+          getDisplay_index();
+          if ( getDisplay_index() > 0 ){
+            operateDisplay_index(-1);
+            
+            row = getRow( getDisplay_index() );
+            console.log( getDisplay_index() );
+            var data = row.get('data');
+            data.show();
+          }
+        }
+      </script>
+</head>
+
+<body onload="start()">
+
+  <!-- select component drop down menu, if in the middle sets current component -->
+  <h3>
+    Component:
+    <select id="component" onChange="updateRange()">
+      {% for df in entries: %}
+       <option value = {{loop.index0}}> {{df.loc[0, 'component']}} </option>
+      {% endfor%}
+    </select>
+    
+    Load:
+    <select id="load_range" onChange="updateRange()">
+      <option value = 1 > 1 </option>
+       {% for i, row in entries[0].iterrows(): %}
+          {% if i%5 == 0 :%}
+            {% if i > 1:%}
+              <option value = {{i}} > {{i}} </option>
+            {% endif %}
+          {% endif %}
+          {% if not  i%5 == 0 :%}
+            {% if i ==  entries[0].index|length :%}
+              <option value = {{i}} > {{i}} </option>
+            {% endif %}
+          {% endif %}
+       {% endfor %}
+       
+    </select>
+    
+  </h3>
+
+  <p>
+  
+  contour
+  <input type="checkbox" id="contour_check" value="contour" onclick="">
+  <br>
+  entries:
+  <br>
+  <Button onclick="colapse()">tracking show/hide</Button>
+  
+  <div id="tracking" style="display: none">
+    <button id="FindMe" title="Find me" onclick="updateView()">Find me!</button>
+    </p>
+    <label for="track">
+    Track position
+    <input id="track" type="checkbox"/>
+    position accuracy : <code id="accuracy"></code>&nbsp;&nbsp;
+    altitude : <code id="altitude"></code>&nbsp;&nbsp;
+    altitude accuracy : <code id="altitudeAccuracy"></code>&nbsp;&nbsp;
+    heading : <code id="heading"></code>&nbsp;&nbsp;
+    speed : <code id="speed"></code>
+    </label>
+    <p></p>
+  </div>
+  <h2 id="title_map">
+  date: , component: 
+  </h2>
+  
+  <div id="map_div"></div>
+  
+  <Button onclick="previous()">javascript previous</Button>
+  ..
+  <Button onclick="next()">javascript next</Button>
+  
+  ..
+  <Button onclick="testdataframe()">test</Button>
+</body>
+
+</html>

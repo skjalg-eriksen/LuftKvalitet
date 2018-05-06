@@ -17,11 +17,14 @@ import io
 import atexit
 from apscheduler.scheduler import Scheduler
 
+import matplotlib
+matplotlib.use('Agg')
+
 import numpy as np
 from pandas.io.json import json_normalize, read_json
 from pylab import *
 import numpy as np
-from pandas import DataFrame, Series
+from pandas import DataFrame, Series, to_datetime
 from scipy.spatial.distance import pdist, squareform
 import pyproj
 import utm
@@ -37,6 +40,8 @@ LEFT = 593065.1648494017;
 BOTTOM = 6638524.509011956;
 RIGHT = 605365.439142052; 
 TOP = 6648891.652304975;
+X0, X1 = 0, RIGHT-LEFT
+Y0, Y1 = 0, TOP-BOTTOM
 
 cron = Scheduler(daemon=True)
 cron.start()
@@ -97,96 +102,108 @@ my_cmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+  return render_template('index.html')
 
 
-@app.route('/img/<_id>', methods=['GET', 'POST'])
+@app.route('/img/<_id>')
 def get_img(_id):
-    
-    X0, X1 = 0, RIGHT-LEFT
-    Y0, Y1 = 0, TOP-BOTTOM
+  #connect to the db
+  client = Cloudant(user, password, url=url, connect=True)
+  db = client.create_database(db_name, throw_on_exists=False)
+  #get the document from the db
+  doc = db[ _id ]
+  
+  #load the krige data
+  H = simplejson.loads(doc['krige_data'])
+  buffr = io.BytesIO()
 
-    #connect to the db
-    client = Cloudant(user, password, url=url, connect=True)
-    db = client.create_database(db_name, throw_on_exists=False)
-    #get the document from the db
-    doc = db[ _id ]
-    H = simplejson.loads(doc['krige_data'])
-    buffr = io.BytesIO()
-    
-    fig, ax = subplots()
-    ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='gaussian', alpha=0.7, extent=[X0, X1, Y0, Y1])
-    ax.axis('off')
-    fig.dpi=400
+  #min max values for the color
+  maxvalue = 100;
+  minvalue = 0;
+  
+  #plot the figure
+  fig, ax = subplots()
+  ax.imshow(H, cmap=my_cmap, vmin=minvalue, vmax=maxvalue, origin='lower', interpolation='gaussian', alpha=0.7, extent=[X0, X1, Y0, Y1])
+  ax.axis('off')
+  #fig.dpi=400
+  
+  #set proper image size and extent to plot
+  fig.set_size_inches(5.95, 5)
+  imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+  #fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
+  fig.savefig(buffr, format='svg', bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
+  
+  #go to start of file
+  buffr.seek(0)
+  
+  return send_file(buffr, mimetype='image/svg+xml')
 
-    fig.set_size_inches(5.95, 5)
-    imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
-    buffr.seek(0)
-    
-    return send_file(buffr, mimetype='image/png')
 
+@app.route('/contour/<_id>')
+def get_contour(_id):
+  #connect to the db
+  client = Cloudant(user, password, url=url, connect=True)
+  db = client.create_database(db_name, throw_on_exists=False)
+  #get the document from the db
+  doc = db[ _id ]
+  H = simplejson.loads(doc['krige_data'])
+  buffr = io.BytesIO()
+  
+  maxvalue = 100;
+  minvalue = 0;
+  fig, ax = subplots()
+  
+  CS = plt.contour(H,vmin=minvalue, vmax=maxvalue,extend='max',  colors='royalblue', origin='lower', alpha=1, extent=[X0, X1, Y0, Y1])
+  plt.clabel(CS, inline=10, fontsize=4 , fmt='%0.1f')
+  
+  #ax.imshow(H, cmap=my_cmap,vmin=minvalue, vmax=maxvalue, origin='lower', interpolation='gaussian', alpha=0.7, extent=[X0, X1, Y0, Y1])
+  ax.axis('off')
+  fig.dpi=400
 
-@app.route('/get/<_id>', methods=['GET'])
-def get_image(_id):
-    
-    
-    X0, X1 = 0, RIGHT-LEFT
-    Y0, Y1 = 0, TOP-BOTTOM
+  fig.set_size_inches(5.95, 5)
+  imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+  fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
+  buffr.seek(0)
+  
+  return send_file(buffr, mimetype='image/png')
 
-    #connect to the db
-    client = Cloudant(user, password, url=url, connect=True)
-    db = client.create_database(db_name, throw_on_exists=False)
-    #get the document from the db
-    doc = db[ _id ]
-    H = simplejson.loads(doc['krige_data'])
-    buffr = io.BytesIO()
-    
-    fig, ax = subplots()
-    ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='gaussian', alpha=0.7, extent=[X0, X1, Y0, Y1])
-    ax.axis('off')
-    fig.dpi=400
-
-    fig.set_size_inches(5.95, 5)
-    imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
-    buffr.seek(0)
-    
-    return send_file(buffr, mimetype='image/png')
 
 @app.route('/info/<_id>')
 def get_info(_id):
-    
-    X0, X1 = 0, RIGHT-LEFT
-    Y0, Y1 = 0, TOP-BOTTOM
+  
+  X0, X1 = 0, RIGHT-LEFT
+  Y0, Y1 = 0, TOP-BOTTOM
 
-    #connect to the db
-    client = Cloudant(user, password, url=url, connect=True)
-    db = client.create_database(db_name, throw_on_exists=False)
-    #get the document from the db
-    doc = db[ _id ]
-    H = simplejson.loads(doc['krige_data'])
-    z = read_json(doc['data'], orient='index')
-    date = doc['date']
-    
-    buffr = io.BytesIO()
-    fig, ax = subplots()    
-    fig.dpi=400
-    ax.imshow(H, cmap=my_cmap, origin='lower', interpolation='nearest', alpha=0.7, extent=[X0, X1, Y0, Y1])
+  #connect to the db
+  client = Cloudant(user, password, url=url, connect=True)
+  db = client.create_database(db_name, throw_on_exists=False)
+  #get the document from the db
+  doc = db[ _id ]
+  H = simplejson.loads(doc['krige_data'])
+  z = read_json(doc['data'], orient='index')
+  date = doc['date']
+ 
+  maxvalue = 100;
+  minvalue = -50;
+  
+  buffr = io.BytesIO()
+  fig, ax = subplots()    
+  fig.dpi=400
+  ax.imshow(H, cmap=my_cmap, vmin=minvalue, vmax=maxvalue, origin='lower', interpolation='nearest', alpha=0.7, extent=[X0, X1, Y0, Y1])
 
-    sc = ax.scatter( z.x, z.y, cmap=my_cmap, c=z.value, linewidths=0.75, s=50 )
-    plt.colorbar(sc)
+  sc = ax.scatter( z.x, z.y, cmap=my_cmap,vmin=minvalue, vmax=maxvalue, c=z.value, linewidths=0.75, s=50 )
+  plt.colorbar(sc)
 
-    fig.suptitle('component: ' + str(z['component'].iloc[0]) + ', date: ' + str(date), fontsize=14)
-    fig.savefig(buffr, dpi = 400)
-    
-    buffr.seek(0)
-    
-    return send_file(buffr, mimetype='image/png')
+  fig.suptitle('component: ' + str(z['component'].iloc[0]) + ', date: ' + str(date), fontsize=14)
+  fig.savefig(buffr, dpi = 400)
+  
+  buffr.seek(0)
+  
+  return send_file(buffr, mimetype='image/png')
 
-@app.route('/show_data', methods=['GET'])
+@app.route('/show_data')
 def show_data():
-  #connect to the db
+   #connect to the db
   client = Cloudant(user, password, url=url, connect=True)
   db = client.create_database(db_name, throw_on_exists=False)
   
@@ -194,57 +211,19 @@ def show_data():
   docs = list(map(lambda doc: doc, db) )
   #put them into a dataframe
   fdocs = json_normalize(docs);
-  fdocs = DataFrame(fdocs, columns=['date', 'component', '_id'])
-  fdocs = fdocs.reset_index(drop=True)
-  fdocs.sort_values(['date', 'component'])
-  #get the components
-  components = fdocs['component'].unique().tolist()
-  
-  #get the requested component
-  if( request.args.get('selected_component') ):
-    selected_component = request.args.get('selected_component')
-  else:
-    selected_component = "PM10"
-  
-  #drop what we dont need.
-  fdocs = fdocs.drop(fdocs[fdocs.component != selected_component].index)
-  fdocs = fdocs.sort_values(['date'], ascending=[False])
-  fdocs = fdocs.reset_index(drop=True)
-  
-  if( request.args.get('index') ):
-    i = int(request.args.get('index'))
-    selected_id = fdocs.loc[i, '_id']
-    selected_date = fdocs.loc[i, 'date']
-    
-  else:
-    i = 0
-    selected_id = fdocs.loc[i, '_id']
-    selected_date = fdocs.loc[i, 'date']
-  
-  
-  return render_template('show.html', 
-  components = components,
-  index = i,
-  _id = selected_id,
-  date = selected_date,
-  component = selected_component,
-  fdocs = fdocs)
-  
-@app.route('/all_entries', methods=['GET'])
-def all_entries():
-  #connect to the db
-  client = Cloudant(user, password, url=url, connect=True)
-  db = client.create_database(db_name, throw_on_exists=False)
-  
-  #get all docs
-  docs = list(map(lambda doc: doc, db) )
-  #put them into a dataframe
-  fdocs = json_normalize(docs);
-  fdocs = DataFrame(fdocs, columns=['date', 'component', '_id'])
+  fdocs = DataFrame(fdocs, columns=['date', 'component', 'data', '_id'])
+  fdocs['date'] = to_datetime(fdocs['date'])
   fdocs = fdocs.reset_index(drop=True)
   fdocs.sort_values(['date', 'component'])
   #get the components
   components = fdocs['component'].unique().tolist();
+  
+  data = [None]* len(fdocs)
+  for i, row in fdocs.iterrows():
+    tmp = read_json(fdocs.loc[i, 'data'], orient='index')
+    tmp = tmp.reset_index()
+    data[i] = tmp
+    fdocs.loc[i, 'data'] = i;
   
   #make a list of same size as components
   complist = [None]* len(components)
@@ -257,9 +236,46 @@ def all_entries():
     tmp = tmp.reset_index(drop=True)
     #put the dataframe into the list
     complist[i] = tmp;
- 
-    
-  return render_template('entries.html', entries = complist);
+  return render_template('show2.html', entries = complist, data = data);
+  
+
+
+@app.route('/all_entries')
+def all_entries():
+  #connect to the db
+  client = Cloudant(user, password, url=url, connect=True)
+  db = client.create_database(db_name, throw_on_exists=False)
+  
+  #get all docs
+  docs = list(map(lambda doc: doc, db) )
+  #put them into a dataframe
+  fdocs = json_normalize(docs);
+  fdocs = DataFrame(fdocs, columns=['date', 'component', 'data', '_id'])
+  fdocs['date'] = to_datetime(fdocs['date'])
+  fdocs = fdocs.reset_index(drop=True)
+  fdocs.sort_values(['date', 'component'])
+  #get the components
+  components = fdocs['component'].unique().tolist();
+  
+  data = [None]* len(fdocs)
+  for i, row in fdocs.iterrows():
+    tmp = read_json(fdocs.loc[i, 'data'], orient='index')
+    tmp = tmp.reset_index()
+    data[i] = tmp
+    fdocs.loc[i, 'data'] = i;
+  
+  #make a list of same size as components
+  complist = [None]* len(components)
+  for i in range(len(components)):
+    #drop everything but relevant info
+    tmp = fdocs.drop(fdocs[fdocs.component != components[i]].index)
+    #sort them
+    tmp = tmp.sort_values(['date'], ascending=[False])
+    #re index the dataframe
+    tmp = tmp.reset_index(drop=True)
+    #put the dataframe into the list
+    complist[i] = tmp;
+  return render_template('entries.html', entries = complist, data = data);
   
 @app.route('/data_min')
 def data_min():
@@ -338,38 +354,97 @@ def spherical_model_plot():
   
 @app.route('/kriging_plot')
 def kriging_plot():
-  date =  str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+  #date =  str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
   data = dataset.data()
   data.sort_values(by=['component'])
   #data.set_index(keys=['component'], drop=False,inplace=True)
   names = data['component'].unique().tolist()
-  
+
   for component in names:
     compdata = data.loc[data.component == component]
+    compdata = compdata.reset_index(drop=True)
     if(4 >len(compdata.index)):
       continue;
     
-    krige_data = krige_task(compdata, date)
+    krige_data = krige_task( compdata[['latitude','longitude', 'value', 'unit', 'component', 'x', 'y']] )
     
-    #define document
+    #define documentDataFrame(compdata, columns=['latitude','longitude', 'value', 'unit', 'component'] )
     document = {
-        'date': date, 
+        'date': str(compdata['toTime'].iloc[0]), 
         'component': str(compdata['component'].iloc[0]),
-        'data' : compdata.to_json(orient='index'),
+        'data' : data.loc[data.component == component].to_json(orient='index'),
         'krige_data' : simplejson.dumps(krige_data.tolist())
     }
+    # 'data' : compdata.to_json(orient='index'),
     #connect to db
     client = Cloudant(user, password, url=url, connect=True)
     db = client.create_database(db_name, throw_on_exists=False)
     #store document
     document = db.create_document(document);
-    
-  return "done.."
+  return data.to_html()
+
+#deletes entries, and old data
+def clean_db():
+  #connect to the db
+  client = Cloudant(user, password, url=url, connect=True)
+  db = client.create_database(db_name, throw_on_exists=False)
+
+  #get all docs
+  docs = list(map(lambda doc: doc, db) )
+  #put them into a dataframe
+  fdocs = json_normalize(docs);
+  fdocs = DataFrame(fdocs, columns=['date', 'component', '_id'])
+  #transform the date column to datetime objects for date operations later
+  fdocs['date'] = to_datetime(fdocs['date'])
+  # Re-index dataframe
+  fdocs = fdocs.reset_index(drop=True)
+  #sort dataframe
+  fdocs.sort_values(['date', 'component'])
+
+  #get the components
+  components = fdocs['component'].unique().tolist();
+
+  #make a list of same size as components
+  complist = [None]* len(components)
+  for i in range(len(components)):
+    #drop everything but relevant info
+    tmp = fdocs.drop(fdocs[fdocs.component != components[i]].index)
+    #sort them
+    tmp = tmp.sort_values(['date'], ascending=[False])
+    #re index the dataframe
+    tmp = tmp.reset_index(drop=True)
+    #put the dataframe into the list
+    complist[i] = tmp;
+
+  #how many days to keep data
+  DAYS_OF_DATA_TO_KEEP = 7
+
+  #go through all dataframes with data on each component
+  for comp in complist:
+    #go through each entry in the dataframe
+    for i, row in comp.iterrows():
+      #if there are more than 1 entry for the date remove it
+      if comp[ row['date'] == comp.date ].count()[1] > 1:
+        #remove entry from dataframe
+        comp = comp.drop( comp[comp.date == row['date'] ].head(1).index )
+        #remove it from the database
+        db[row['_id']].delete()
+        continue;
+        
+      
+      #if there are entries older than DAYS_OF_DATA_TO_KEEP, remove them
+      if((row['date'].today() - row['date']) > datetime.timedelta(DAYS_OF_DATA_TO_KEEP)):
+        comp = comp.drop( comp[comp.date == row['date'] ].head(1).index )
+        db[row['_id']].delete()
+    print comp
+  
+  
+  
   
 @cron.interval_schedule(hours=3)
 def job_function():
   kriging_plot()
-  
+  clean_db()
 
 # Shutdown your cron thread if the web process is stopped
 atexit.register(lambda: cron.shutdown(wait=False))

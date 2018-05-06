@@ -17,7 +17,7 @@ def data():
   # puts it in a dataframe
   fdata = json_normalize(jdata)
   # picks out the wanted values
-  fdata = DataFrame(fdata, columns=['latitude','longitude', 'value', 'unit', 'component'] )
+  fdata = DataFrame(fdata, columns=['latitude','longitude', 'value', 'unit', 'component', 'toTime'] )
   
   # print(fdata)
   

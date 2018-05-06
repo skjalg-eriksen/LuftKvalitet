@@ -31,6 +31,8 @@ import numpy as np
 from pandas import DataFrame, Series
 from scipy.spatial.distance import pdist, squareform
 
+import utm;
+
 #map corners
 LEFT = 593065.1648494017; 
 BOTTOM = 6638524.509011956;
@@ -38,8 +40,46 @@ RIGHT = 605365.439142052;
 TOP = 6648891.652304975;
 
 
-def krige_task(data, date): 
+def krige_task(data): 
   z = data
+  print z
+  #coustom points
+  num_points = len(z.index)
+  unit_type = z.loc[1, 'unit']
+  comp_type = z.loc[1, 'component']
+
+  temp_sum = 0
+  lowest_point = 900000  #just some large number so that we can find the lowest in the table
+
+  for i, row in z.iterrows():
+      temp_sum = z.loc[i, 'value']
+
+  #lowest value
+  for i, row in z.iterrows():
+    if lowest_point > z.loc[i, 'value']:
+      lowest_point = z.loc[i, 'value']
+      
+  average = temp_sum/num_points
+  new_low = lowest_point*0.4
+
+  lat1 = 59.873800
+  long1 = 10.662291
+  #59.878971, 10.678320
+  #59.890065, 10.717549
+  #59.880442, 10.746924
+  #59.874472, 10.871463
+  #59.957640, 10.820121
+  #59.902286, 10.871526
+  lant_arr =[59.878971, 59.890065, 59.880442, 59.874472, 59.957640, 59.902286]
+  lat_arg  =[10.678320, 10.717549, 10.746924, 10.871463, 10.820121, 10.871526]
+  t = 0;
+  for i in lant_arr:
+    x = utm.from_latlon( lant_arr[t], lat_arg[t] )[0]  - utm.from_latlon(lat1, long1)[0];
+    y = utm.from_latlon( lant_arr[t], lat_arg[t] )[1] - utm.from_latlon(lat1, long1)[1];
+    new_df = [lant_arr[t],lat_arg[t],new_low,unit_type, comp_type, x, y]
+    t = t+1
+    z.loc[len(z)] = new_df
+  
   # part of our data set recording porosity
   P = np.array( z[['x','y','value']] )
   # bandwidth, plus or minus 250 meters
@@ -54,7 +94,11 @@ def krige_task(data, date):
 
   nx = 48
   ny = 60
+  
   num_points = len(z.index)
+  if (num_points > 10):
+    num_points = 10;
+  
   Z = np.zeros((ny,nx))
   dx, dy = (X1-X0)/float(nx), (Y1-Y0)/float(ny)
   for i in range(nx):
@@ -84,10 +128,12 @@ def krige_task(data, date):
   H = np.zeros_like( Z )
   for i in range( Z.shape[0] ):
       for j in range( Z.shape[1] ):
-          H[i,j] = np.round( Z[i,j]*20 )
+          H[i,j] = np.round( Z[i,j] )
 
   return H;
   
+  
+  '''
   #image with info
   fig, ax = subplots()    
   fig.dpi=400
@@ -110,7 +156,7 @@ def krige_task(data, date):
   fig.set_size_inches(5.95, 5)
   imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
   fig.savefig("img",dpi = 400 , bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
-  
+  '''
   
   '''
   print("Running kriging");

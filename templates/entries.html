@@ -5,26 +5,161 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="{{ url_for('static', filename='./dataframe-js/dist/dataframe.js')}}"></script>
     <title>Luftkvalitet</title>
+    
+    <script>
+      var DataFrame = dfjs.DataFrame;
+      
+      var dfs = []
+      const df = new DataFrame({
+        column1: [3, 6, 8], // <------ A column
+        column2: [3, 4, 5, 6],
+        }, ['column1', 'column2']);
+      //df.show();
+      
+      
+      const datafrm = [];
+      {% for df in entries: %}
+        datafrm[{{loop.index0}}] = new DataFrame(
+        {column1:[
+          {% for i, row in df.iterrows(): %}
+            {%if i > 0 :%}
+              {{','}}
+            {% endif %}
+            '{{row['date']}}'
+          {% endfor %}
+        ],
+        column2:[
+          {% for i, row in df.iterrows(): %}
+            {%if i > 0 :%}
+              {{','}}
+            {% endif %}
+            '{{row['component']}}'
+          {% endfor %}
+        ],
+        column3:[
+          {% for i, row in df.iterrows(): %}
+            {%if i > 0 :%}
+              {{','}}
+            {% endif %}
+              {% set sub_df = data[ row['data'] ] %}
+              new DataFrame({
+                column1: [
+                  {% for i, row in sub_df.iterrows(): %}
+                    {%if i > 0 :%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['component']}}'
+                  {% endfor %}
+                ],
+                column2: [
+                  {% for i, row in data[ row['data'] ].iterrows(): %}
+                    {%if i >  0:%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['latitude']}}'
+                  {% endfor %}
+                ],
+                column3: [
+                  {% for i, row in data[ row['data'] ].iterrows(): %}
+                    {%if i > 0 :%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['longitude']}}'
+                  {% endfor %}
+                ],
+                column4: [
+                  {% for i, row in data[ row['data'] ].iterrows(): %}
+                    {%if i > 0 :%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['toTime']}}'
+                  {% endfor %}
+                ],
+                column5: [
+                  {% for i, row in data[ row['data'] ].iterrows(): %}
+                    {%if i > 0 :%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['unit']}}'
+                  {% endfor %}
+                ],
+                column6: [
+                  {% for i, row in data[ row['data'] ].iterrows(): %}
+                    {%if i > 0 :%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['value']}}'
+                  {% endfor %}
+                ],
+                column7: [
+                  {% for i, row in data[ row['data'] ].iterrows(): %}
+                    {%if i > 0 :%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['x']}}'
+                  {% endfor %}
+                ],
+                column8: [
+                  {% for i, row in data[ row['data'] ].iterrows(): %}
+                    {%if i > 0 :%}
+                      {{','}}
+                    {% endif %}
+                    '{{row['y']}}'
+                  {% endfor %}
+                ]
+                }, ['component',	'latitude',	'longitude',	'toTime',	'unit',	'value',	'x',	'y'])
+                
+          {% endfor %}
+        ],
+        colum4:[
+          {% for i, row in df.iterrows(): %}
+            {%if i > 0 :%}
+              {{','}}
+            {% endif %}
+            '{{row['_id']}}'
+          {% endfor %}
+        ],
+        colum5:[
+          {% for i, row in df.iterrows(): %}
+            {%if i > 0 :%}
+              {{','}}
+            {% endif %}
+            '{{i}}'
+          {% endfor %}
+        ]},
+        ['date', 'component', 'data', '_id', 'index']);
+        datafrm[{{loop.index0}}].show(50);
+        datafrm[{{loop.index0}}].dim();
+        
+        datafrm[{{loop.index0}}].chain(
+          row => row.get('data').show(),
+          row => ""
+        )
+        
+      {% endfor %}
+      
+    </script>
     
 </head>
 
 <body>
-   {% for df in entries: %}
-     <h3>{{df['component'].iloc[0]}}</h3>
-     
-     {% for i, row in df.iterrows(): %}
-        <form action="{{url_for('show_data')}}" methods=['GET']>
-        
-           <input type="hidden" name="index" value="{{i}}" >
-           <input type="hidden" name="selected_component" value="{{df['component'].iloc[0]}}">
-           
-           index:{{i}}  date:{{df.loc[i, "date"]}} component:{{df.loc[i, "component"]}}
-          <input type="submit" value="go to">
-        </form>
-     {% endfor %}
-   {% endfor %}
+
+
+{% for df in entries: %}
+  <h3>{{df['component'].iloc[0]}}</h3>
+  {% for i, row in df.iterrows(): %}
+    index:{{i}}  date: {{df.loc[i, "date"]}} component:{{df.loc[i, "component"]}}
+    <a href="{{ url_for('get_img', _id=df.loc[i, '_id']) }}"> img </a> |
+    <a href="{{ url_for('get_info', _id=df.loc[i, '_id']) }}" > detailed img</a> |
+    <a href="{{ url_for('get_contour', _id=df.loc[i, '_id']) }}" > contour plot</a>
+    <br>
+    
+    
+    <br>
+  {% endfor %}
+{% endfor %}
    
 </body>
-
 </html>

@@ -28,6 +28,7 @@
           console.log("{{i}}    {{fdocs.loc[i, '_id']}}");
           window.loaded[{{i}}] = new Image();
           window.loaded[{{i}}].src = '/img/' + '{{fdocs.loc[i, '_id']}}';
+          window.loaded[{{i}}].title = "index: {{ i }} date: {{fdocs.loc[i, 'date']}}, component: {{fdocs.loc[i, 'component']}}";
           
           {% if i == 0 %}
             loadmap();
@@ -216,6 +217,8 @@ geocoder.on('addresschosen', function (evt) {
         });
         window.mapImage.setSource(nextimg);
         
+        document.getElementById("title_map").innerHTML = window.loaded[window.index].title;
+        
         //document.body.appendChild( window.loaded[window.index] );
         console.log(window.index);
         }else {
@@ -234,6 +237,7 @@ geocoder.on('addresschosen', function (evt) {
           imageExtent: window.imageExtent
         });
         window.mapImage.setSource(nextimg);
+        document.getElementById("title_map").innerHTML = window.loaded[window.index].title;
         console.log(window.index);
       }else {
         console.log("index no index lower than ", window.index);
@@ -246,11 +250,6 @@ geocoder.on('addresschosen', function (evt) {
 </head>
 
 <body onload="load()">
-
-  <Button onclick="previous()">javascript previous</Button>
-  ..
-  <Button onclick="next()">javascript next</Button>
-
 
   <!-- select component drop down menu, if in the middle sets current component -->
   <h3>
@@ -272,24 +271,9 @@ geocoder.on('addresschosen', function (evt) {
 
 
   <p>
-  <form style="display: inline;">
-    <input type="hidden" name="index" value="{{index-1}}" >
-    <input type="hidden" name="selected_component" value="{{component}}">
-    <input type="submit" 
-    {% if (index < 1) : %}
-      disabled
-    {% endif %}
-      value="previous">
-  </form>
-  <form style="display: inline;"> 
-    <input type="hidden" name="index" value="{{index+1}}" >
-    <input type="hidden" name="selected_component" value="{{component}}">
-    <input type="submit"
-    {% if index == fdocs.index|length -1: %}
-      disabled
-    {% endif %}
-     value="next">
-  </form>
+  <Button onclick="previous()">javascript previous</Button>
+  ..
+  <Button onclick="next()">javascript next</Button>
   entries: {{fdocs.index|length}}
   <button id="FindMe" title="Find me" onclick="updateView()">Find me!</button>
   </p>
@@ -305,7 +289,7 @@ geocoder.on('addresschosen', function (evt) {
   <p></p>
   <!-- write out _id, date, component -->
   image database document id: {{ _id }},  index: {{ index }}<br>
-  <h2>
+  <h2 id="title_map">
   date: {{ date }}, component: {{ component }}
   </h2>
   
