@@ -417,7 +417,7 @@ def clean_db():
     complist[i] = tmp;
 
   #how many days to keep data
-  DAYS_OF_DATA_TO_KEEP = 7
+  DAYS_OF_DATA_TO_KEEP = 14
 
   #go through all dataframes with data on each component
   for comp in complist:

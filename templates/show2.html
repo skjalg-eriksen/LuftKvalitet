@@ -3,21 +3,22 @@
 
 <head>
     <meta charset="utf-8">
-   
 
     <link rel="stylesheet" href="https://openlayers.org/en/v4.6.5/css/ol.css" type="text/css">
     <script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
     <script src="{{ url_for('static', filename='./proj4js-2.4.3/dist/proj4.js')}}"></script>
     <script type=text/javascript src="{{url_for('static', filename='jquery.js') }}"></script>
     
-    <link href="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.min.css')}}" rel="stylesheet">
-    <script src="{{ url_for('static', filename='./ol-geocoder-3.0.1/dist/ol-geocoder.js')}}"></script>
+    <link href="https://cdn.jsdelivr.net/npm/ol-geocoder@latest/dist/ol-geocoder.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/ol-geocoder"></script>
 	
-	<script src="{{ url_for('static', filename='./dataframe-js/dist/dataframe.js')}}"></script>
-  
+    <script src="{{ url_for('static', filename='./dataframe-js/dist/dataframe.js')}}"></script>
+    <script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
     
+    <link rel="stylesheet" href="{{ url_for('static', filename='./show.css')}}">
   
-
   <script>
   
     //display index
@@ -25,11 +26,8 @@
     function getDisplay_index(){
       return display_index;
     }
-    function operateDisplay_index( a ){
-      display_index = display_index + a;
-    }
-    function resetDisplay_index(){
-      display_index = 0;
+    function setDisplay_index( a ){
+      display_index = a;
     }
     
     
@@ -38,17 +36,34 @@
       return document.getElementById("load_range").value; 
     }
     
+    function setRange(new_val) {
+      document.getElementById("load_range").value = new_val; 
+    }
+    
+    function getContourToggle(){
+      return document.getElementById("contour_toggle").value;
+    }
+    function setContourToggle( new_val ){
+      document.getElementById("contour_toggle").value = new_val;
+    }
+    
+    function setComponent(new_val){
+      document.getElementById("component").value = new_val; 
+    }
+    
     function updateRange(){
+      setLoadingTextVisible(true);
+      setDisplay_index(0);
+      setSliderRange(getRange());
       load_for();
-      resetDisplay_index();
     }
     
     var loaded = 0;
     function incrementLoaded(){
       loaded++;
       if (loaded == getRange()*2){
-        console.log("finished loading");
-        
+        updateMap();
+        setLoadingTextVisible(false);
       }
     }
     function resetLoaded(){
@@ -58,182 +73,24 @@
   </script>
   
   <script type="text/javascript">
-    var mapImage;
-    var contourImage;
-    var imageExtent;
   
-    function loadmap(){
-      
-      window.imageExtent = [
+    var imageExtent = [
         593065.1648494017,
         6638524.509011956,
         605365.439142052,
         6648891.652304975
       ];
-      
-      window.mapImage = new ol.layer.Image({
-      source: new ol.source.ImageStatic({
-        url: '{{url_for('get_img', _id= entries[0].loc[0, '_id']) }}',
-        projection: "EPSG:32632",
-        imageExtent: window.imageExtent
-      }),
-      opacity: 0.65
-    });
-    
-    //contourplot
-    window.contourImage = new ol.layer.Image({
-      source: new ol.source.ImageStatic({
-        url: '',
-        projection: "EPSG:32632",
-        imageExtent: imageExtent
-      }),
-      opacity: 0.85
-    });
-    
     var vectorSource = new ol.source.Vector(),
-    vectorLayer = new ol.layer.Vector({
-      source: vectorSource
-    });
-      
-      proj4.defs(
-        "EPSG:32632",
-        "+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
-      );
-      
-
-
-
-
-var view = new ol.View({
-  center: ol.proj.transform(
-    ol.extent.getCenter(window.imageExtent),
-    "EPSG:32632",
-    "EPSG:3857"
-  ),
-  zoom: 13,
-  minZoom: 11,
-  maxZoom: 21
-});
-var map = new ol.Map({
-  controls: ol.control.defaults().extend([
-    new ol.control.FullScreen()
-  ]),
-  interactions: ol.interaction.defaults().extend([
-    new ol.interaction.DragRotateAndZoom()
-  ]),
-  layers: [
-    new ol.layer.Tile({
-      source: new ol.source.OSM()
-    }),
-    window.mapImage,
-    window.contourImage,
-    vectorLayer
-  ],
-  target: "map_div",
-  loadTilesWhileAnimating: true,
-  view: view
-});
-
-var geolocation = new ol.Geolocation({
-  projection: view.getProjection()
-});
-function el(id) {
-  return document.getElementById(id);
-}
-
-el('track').addEventListener('change', function() {
-  geolocation.setTracking(this.checked);
-});
-
-// update the HTML page when the position changes.
-geolocation.on('change', function() {
-  el('accuracy').innerText = geolocation.getAccuracy() + ' [m]';
-  el('altitude').innerText = geolocation.getAltitude() + ' [m]';
-  el('altitudeAccuracy').innerText = geolocation.getAltitudeAccuracy() + ' [m]';
-  el('heading').innerText = geolocation.getHeading() + ' [rad]';
-  el('speed').innerText = geolocation.getSpeed() + ' [m/s]';
-  updateView();
-});
-
-// handle geolocation error.
-geolocation.on('error', function(error) {
-  var info = document.getElementById('info');
-  info.innerHTML = error.message;
-  info.style.display = '';
-});
-
-var accuracyFeature = new ol.Feature();
-geolocation.on('change:accuracyGeometry', function() {
-  accuracyFeature.setGeometry(geolocation.getAccuracyGeometry());
-});
-
-var positionFeature = new ol.Feature();
-positionFeature.setStyle(new ol.style.Style({
-  image: new ol.style.Circle({
-    radius: 6,
-    fill: new ol.style.Fill({
-      color: '#3399CC'
-    }),
-    stroke: new ol.style.Stroke({
-      color: '#fff',
-      width: 2
-    })
-  })
-}));
-
-geolocation.on('change:position', function() {
-  var coordinates = geolocation.getPosition();
-  positionFeature.setGeometry(coordinates ?
-    new ol.geom.Point(coordinates) : null);
-});
-new ol.layer.Vector({
-  map: map,
-  source: new ol.source.Vector({
-    features: [accuracyFeature, positionFeature]
-  })
-});
-
-//Centers the view to where the geolocation is
-function updateView() {
-  view.setCenter(geolocation.getPosition());
-}
-
-
-//Instantiate with some options and add the Control
-var geocoder = new Geocoder('nominatim', {
-  provider: 'osm',
-  lang: 'en',
-  countrycodes : 'no',
-  placeholder: 'Search for ...',
-  featureStyle: '',
-  limit: 5,
-  debug: false,
-  autoComplete: true,
-  keepOpen: true
-});
-map.addControl(geocoder);
-  
-//Listen when an address is chosen
-geocoder.on('addresschosen', function (evt) {
-	console.info(evt);
-  window.setTimeout(function () {
-    //popup.show(evt.coordinate, evt.address.formatted);
-  }, 3000);
-});
-  
-
-
-    
-var longs = [10.724470, 10.833630, 10.704070, 10.765730, 10.798030];
-var lats  = [59.932330, 59.9211, 59.911320, 59.922950, 59.941030];
-
-var iconStyle = new ol.style.Style({
+          vectorLayer = new ol.layer.Vector({
+            source: vectorSource
+          });
+    var iconStyle = new ol.style.Style({
     image: new ol.style.Icon({
         anchorXUnits: 'fraction',
         anchorYUnits: 'pixels',
         opacity: 1,
         scale: 0.3,
-        src: 'https://puu.sh/Ac0Pw/939d76316a.png'
+        src: '{{ url_for('static', filename='./icon.png')}}' 
     }),
     text: new ol.style.Text({
         font: '19px Calibri,sans-serif',
@@ -241,20 +98,609 @@ var iconStyle = new ol.style.Style({
         stroke: new ol.style.Stroke({
             color: '#fff', width: 2
         }),
-        //text: 'Omega LuL'
+        //text: 'Text'
     })
-});
+      });
+    //basemap
+    var map_base_img = new ol.layer.Image({
+      source: new ol.source.ImageStatic({
+        url: "",
+        projection: "EPSG:32632",
+        imageExtent: imageExtent
+      }),
+      opacity: 0.65
+    });
+
+    //contourplot
+    var map_contour = new ol.layer.Image({
+      source: new ol.source.ImageStatic({
+        url: "",
+        projection: "EPSG:32632",
+        imageExtent: imageExtent
+      }),
+      opacity: 0.65
+    });
+  
+    function loadmap(){
+      
+     window.app = {};
+      var app = window.app;
+
+      proj4.defs(
+        "EPSG:32632", 
+        "+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+      );
+      
+      
+
+      
+      //Some Station marker stuff end
 
 
-for (i = 0; i <longs.length; i++) {
-  var pos = ol.proj.fromLonLat([longs[i], lats[i]]);
-  var feature = new ol.Feature(
-        new ol.geom.Point(pos)
-    );
-    feature.setStyle(iconStyle);
-    vectorSource.addFeature(feature);
-}
+      //Ekstra popup stuff
+      var container = document.getElementById('popupGPS');
+      var content = document.getElementById('popup-content');
+      var closer = document.getElementById('popup-closer');
+
+      var overlay = new ol.Overlay({
+        element: container,
+        autoPan: true,
+        autoPanAnimation: {
+          duration: 250
+        }
+      });
+      closer.onclick = function() {
+        overlay.setPosition(undefined);
+        closer.blur();
+        return false;
+      };
+      //extra end
+
+
+
+
+
+
+      var view = new ol.View({
+        center: ol.proj.transform(
+          ol.extent.getCenter(imageExtent),
+          "EPSG:32632",
+          "EPSG:3857"
+        ),
+        zoom: 11,
+        minZoom: 11.7,
+        maxZoom: 20
+      });
+
+      app.Loading = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var text = document.createElement('text');
+        text.id = "loadingText";
+        //Visible
+        text.style.display = "block";
+        //Invisible
+        text.style.display = "none";
+        text.innerHTML = 'Loading ⌛';
+        
+        var element = document.createElement('div');
+        element.className = 'Loading-text ol-unselectable ol-control';
+        element.appendChild(text);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.Loading, ol.control.Control);
+      
+      app.HistoricSlider = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var slider = document.createElement('input');
+            slider.id = "slider";
+            slider.orientation = 'vertical';
+            slider.type = 'range';
+            slider.min = 0;
+            slider.max = 0;
+            slider.value = 0;
+            slider.step = 1;
+            slider.addEventListener("input", function() {
+            setDisplay_index( parseInt(slider.value) );
+            updateMap();
+          });
+        
+        var element = document.createElement('div');
+        element.className = 'slider-control ol-unselectable ol-control';
+        element.appendChild(slider);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.HistoricSlider, ol.control.Control);
+
+      app.DropDown = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var dropdown = document.createElement('select');
+            dropdown.id = "map_component";
+
+            {% for df in entries: %}
+              dropdown.appendChild(new Option("{{df.loc[0, 'component']}}", "{{loop.index0}}"));
+            {% endfor%}
+            
+            dropdown.addEventListener("change", function() {
+              setComponent( dropdown.value );
+              updateRange();
+            });
+            var text = document.createElement('text');
+            text.innerHTML = 'Component:';
+        
+        var element = document.createElement('div');
+        element.className = 'dropdown-control ol-unselectable ol-control';
+        element.appendChild(text);
+        element.appendChild(dropdown);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.DropDown, ol.control.Control);
+
+
+      app.PreviousButton = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var button = document.createElement('button');
+        button.innerHTML = '<';
+        button.addEventListener("click", function() {
+              previous();
+            });
+        var element = document.createElement('div');
+        element.className = 'previous-button ol-unselectable ol-control';
+        element.appendChild(button);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.PreviousButton, ol.control.Control);
+
+      app.PlayPauseButton = function(opt_options) {
+        var play = '►';
+        var pause = 'II';
+        var options = opt_options || {};
+        var on = false;
+        var slideInterval;
+        
+        var button = document.createElement('button');
+        button.innerHTML = play;
+        button.addEventListener("click", function() {
+          if (on){
+            button.innerHTML = pause;
+            function nextSlide(){
+              next();
+              if (getDisplay_index() == getRange()-1){
+                on = false;
+                button.innerHTML = play;
+                clearInterval(slideInterval);
+              }
+            }
+            slideInterval = setInterval(nextSlide,1000);
+            
+          }else{
+            button.innerHTML = play;
+            clearInterval(slideInterval);
+          }
+          on = !on;
+        });
+        
+        var element = document.createElement('div');
+        element.className = 'play-pause-button ol-unselectable ol-control';
+        element.appendChild(button);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.PlayPauseButton, ol.control.Control);
+
+      app.NextButton = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var button = document.createElement('button');
+        button.innerHTML = '>';
+        button.addEventListener("click", function() {
+              next();
+            });
+        
+
+        var element = document.createElement('div');
+        element.className = 'next-button ol-unselectable ol-control';
+        element.appendChild(button);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.NextButton, ol.control.Control);
+
+      app.PositionButton = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var button = document.createElement('button');
+        button.id = "GPS";
+        button.innerHTML = '📍';
+
+        var this_ = this;
+        var custom_button = function() {
+            geolocation.setTracking(true);
+            view.setCenter( geolocation.getPosition() );
+        };
+
+        button.addEventListener('click', custom_button, false);
+        button.addEventListener('touchstart', custom_button, false);
+
+        var element = document.createElement('div');
+        element.className = 'position-north ol-unselectable ol-control';
+        element.appendChild(button);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.PositionButton, ol.control.Control);
+
+      app.DateText = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var text = document.createElement('text');
+        text.id = "date-id";
+        text.innerHTML = 'Date: 0000-00-00 00:00:00';
+        
+        var element = document.createElement('div');
+        element.className = 'Date-text ol-unselectable ol-control';
+        element.appendChild(text);
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.DateText, ol.control.Control);
+      
+      app.Contour = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var checkbox = document.createElement('input');
+            checkbox.id = "conCheckbox";
+            checkbox.setAttribute("type", "checkbox");
+            checkbox.setAttribute("value", "ff");
+            checkbox.addEventListener("change", function() {
+              setContourToggle( checkbox.checked );
+              updateMap();
+            });
+            
+        var textB = document.createElement("text"); 
+        textB.innerHTML = 'Contour: ';
+        var element = document.createElement('div');
+        element.className = 'contour ol-unselectable ol-control';
+        element.appendChild(textB);
+        element.appendChild(checkbox);
+
+        ol.control.Control.call(this, {
+        element: element,
+        target: options.target
+        });
+      };
+      ol.inherits(app.Contour, ol.control.Control);
+      
+      app.Range = function(opt_options) {
+
+        var options = opt_options || {};
+
+        var dropdown = document.createElement('select');
+            dropdown.id = "map_range";
+            dropdown.appendChild(new Option(1, 1));
+            
+              {% for i, row in entries[0].iterrows(): %}
+                {% if i%5 == 0 :%}
+                  {% if i > 1:%}
+                    dropdown.appendChild(new Option({{i}}, {{i}}));
+                  {% endif %}
+                {% endif %}
+                {% if not i%5 == 0 :%}
+                  {% if i == (entries[0].index|length - 1) :%}
+                    dropdown.appendChild(new Option({{i}}, {{i}}));
+                  {% endif %}
+                {% endif %}
+             {% endfor %}
+             var text = document.createElement('text');
+             text.innerHTML = 'Range: ';
+              
+        dropdown.addEventListener("change", function() {
+          setRange( dropdown.value );
+          updateRange();
+        });
+        
+        var element = document.createElement('div');
+        element.className = 'range-control ol-unselectable ol-control';
+        element.appendChild(text);
+        element.appendChild(dropdown);
+        
+
+        ol.control.Control.call(this, {
+          element: element,
+          target: options.target
+        });
+
+      };
+      ol.inherits(app.Range, ol.control.Control);
+
+      var map = new ol.Map({
+        controls: ol.control.defaults().extend([
+          new ol.control.FullScreen(),
+          new app.DropDown(),
+          new app.PositionButton(),
+          new app.DateText(),
+          new app.HistoricSlider(),
+          new app.PreviousButton(),
+          new app.NextButton(),
+          new app.PlayPauseButton(),
+          new app.Range(),
+          new app.Contour(),
+          new app.Loading()
+        ]),
+        interactions: ol.interaction.defaults().extend([
+          new ol.interaction.DragRotateAndZoom()
+        ]),
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          }),
+          map_base_img, 
+          map_contour,
+          vectorLayer
+        ],
+        overlays: [overlay],
+        target: "map",
+        loadTilesWhileAnimating: true,
+        view: view
+      });
+
+
     
+
+
+      //end of marker
+
+
+      //Marker Click start
+      var element = document.getElementById('popup');
+
+      var popup = new ol.Overlay({
+        element: element,
+        positioning: 'bottom-center',
+        stopEvent: false,
+        offset: [0, 0]
+      });
+      map.addOverlay(popup);
+
+      // display popup on click
+      map.on('click', function(evt) {
+        var feature = map.forEachFeatureAtPixel(evt.pixel,
+            function(feature) {
+              return feature;//w
+            });
+        if (feature) {
+          $(element).popover('destroy');
+          overlay.setPosition(undefined);
+          closer.blur();
+          var coordinates = feature.getGeometry().getCoordinates();
+          popup.setPosition(coordinates);
+          $(element).popover({
+            'title': feature.get('name'),
+            'placement': 'auto',
+            'animation': false,
+            'html': true,
+            'content': feature.get('content') 
+          });
+          $(element).popover('show');
+        } else {
+          $(element).popover('destroy');
+           var coordinate = evt.coordinate;
+        var hdms = ol.coordinate.toStringHDMS(ol.proj.transform(
+            coordinate, 'EPSG:3857', 'EPSG:4326'));
+
+        content.innerHTML = '<p>You clicked at the coordinates:</p><code>' + hdms +
+            '</code>';
+        overlay.setPosition(coordinate);
+        }
+      });
+
+      //Marker Click end
+
+      var geolocation = new ol.Geolocation({
+        projection: view.getProjection()
+      });
+
+      // update the HTML page when the position changes.//
+      geolocation.on('change', function() {
+        updateView();
+      });
+
+      // handle geolocation error.
+      geolocation.on('error', function(error) {
+        var info = document.getElementById('info');
+        info.innerHTML = error.message;
+        info.style.display = '';
+      });
+
+      var accuracyFeature = new ol.Feature();
+      geolocation.on('change:accuracyGeometry', function() {
+        accuracyFeature.setGeometry(geolocation.getAccuracyGeometry());
+      });
+
+      var positionFeature = new ol.Feature();
+      positionFeature.setStyle(new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 6,
+          fill: new ol.style.Fill({
+            color: '#3399CC'
+          }),
+          stroke: new ol.style.Stroke({
+            color: '#fff',
+            width: 2
+          })
+        })
+      }));
+
+      geolocation.on('change:position', function() {
+        var coordinates = geolocation.getPosition();
+        positionFeature.setGeometry(coordinates ?
+          new ol.geom.Point(coordinates) : null);
+      });
+
+      new ol.layer.Vector({
+        map: map,
+        source: new ol.source.Vector({
+          features: [accuracyFeature, positionFeature]
+        })
+      });
+
+      //Centers the view to where the geolocation is
+      function updateView() {
+        view.setCenter(geolocation.getPosition());
+      }
+
+      //Centers the view to where the geolocation is
+      function updateView() {
+        view.setCenter(geolocation.getPosition());
+      }
+
+
+      //Instantiate with some options and add the Control
+      var geocoder = new Geocoder('nominatim', {
+        provider: 'osm',
+        lang: 'en',
+        countrycodes : 'no',
+        placeholder: 'Search for ...',
+        featureStyle: '',
+        limit: 5,
+        debug: false,
+        autoComplete: true,
+        keepOpen: false
+      });
+      map.addControl(geocoder);
+        
+      //Listen when an address is chosen
+      geocoder.on('addresschosen', function (evt) {
+        console.info(evt);
+        window.setTimeout(function () {
+          //popup.show(evt.coordinate, evt.address.formatted);
+        }, 3000);
+      });
+
+      function wait(ms){
+         var start = new Date().getTime();
+         var end = start;
+         while(end < start + ms) {
+           end = new Date().getTime();
+        }
+      }
+
+
+
+    }
+    
+    function setImg(imgsrc){
+      var nextimg = new ol.source.ImageStatic({
+            url: imgsrc,
+            projection: "EPSG:32632",
+            imageExtent: imageExtent
+          });
+          map_base_img.setSource(nextimg);
+    }
+    function setContour(imgsrc){
+      
+      if (imgsrc == ""){
+        var nextimg = new ol.source.ImageStatic({
+              //set it to 1 transparent pixel in base64 to make it update and remove old contour.
+              url: "data:image/png;base64, iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+              projection: "EPSG:32632",
+              imageExtent: imageExtent
+            });
+        map_contour.setSource(nextimg);
+      }else{
+        var nextimg = new ol.source.ImageStatic({
+              url: imgsrc,
+              projection: "EPSG:32632",
+              imageExtent: imageExtent
+            });
+            map_contour.setSource(nextimg);
+      }
+    }
+    function setDate(date){
+      text = document.getElementById("date-id");
+      text.innerHTML = 'Date: ' + date;
+    }
+    
+    function addFeature (latitude, longitude, title, content){
+      var pos = ol.proj.fromLonLat([longitude, latitude]);
+      var feature = new ol.Feature({
+            geometry: new ol.geom.Point(pos),
+            name: title,
+            content: content
+      });
+        feature.setStyle(iconStyle);
+        vectorSource.addFeature(feature);
+    }
+    function clearFeatures() {
+        var features = vectorLayer.getSource().getFeatures();
+        features.forEach((feature) => {
+            vectorLayer.getSource().removeFeature(feature);
+        });
+    }
+    
+    function setLoadingTextVisible( val ){
+      text = document.getElementById("loadingText");
+      if (val) {  
+        text.style.display = "block";
+      }else {
+        text.style.display = "none";
+      }
+    }
+    
+    function setSliderRange(a){
+      slider = document.getElementById("slider");
+      slider.max = a-1;
+    }
+    function updateSliderValue(){
+      slider = document.getElementById("slider");
+      slider.value = getDisplay_index();
     }
     
   </script>  
@@ -385,16 +831,9 @@ for (i = 0; i <longs.length; i++) {
           colum7:[]
         },
         ['date', 'component', 'data', '_id', 'index', 'img', 'contour']);
-        datafrm[{{loop.index0}}].show(50);
+        
       {% endfor %}
       
-      function testdataframe(){
-        //lat, long
-        //return dataframe [value value] [date date]
-        var his = getHistory(59.9211, 10.83363); //first station at index 0 in NO2
-        his.show(50);
-        //| NO2       | 59.9211   | 10.83363  | 2018-0... | µg/m³     | 7.9137.
-      }
       
       function getDataframeIndex(){
         return document.getElementById("component").value;
@@ -448,21 +887,99 @@ for (i = 0; i <longs.length; i++) {
         var history = new DataFrame(
           {
             column1:[],
-            colum2:[],
+            colum2: [],
             column3:[],
-            colum4:[]
+            colum4: []
           }, ['date', 'component',  'value', 'unit']);
         
         for (var i = 0; i < dataframe.count(); i++){
           var station = getRow(i).get('data');
           station = station.find(row => row.get('latitude') == latitude && row.get('longitude') == longitude);
-          //console.log(station.get('value'));
           
-          history = history.push( [station.get('toTime'), station.get('component'), station.get('value'), station.get('unit')] );
+          if(station){
+            history = history.push( [station.get('toTime'), station.get('component'), station.get('value'), station.get('unit')] );
+          }
         }
-      
+        
         return history;
       }
+      
+      function getHistoryAt(latitude, longitude, date){
+        var dataframe = getDataframe();
+        var history = new DataFrame(
+          {
+            column1:[],
+            colum2: [],
+            column3:[],
+            colum4: []
+          }, ['date', 'component',  'value', 'unit']);
+        
+        var requested_time = date.split(' ')[1];
+        
+        for (var i = 0; i < dataframe.count(); i++){
+          var station = getRow(i).get('data');
+          station = station.find(row => row.get('latitude') == latitude && row.get('longitude') == longitude);
+          
+          if(station){
+            var time = station.get('toTime').split('T')[1].split('+')[0];
+            if (time == requested_time){
+              history = history.push( [station.get('toTime'), station.get('component'), station.get('value'), station.get('unit')] );
+            }
+          }
+        }
+        return history;
+      }
+ 
+      function getStats(latitude, longitude){ 
+        var stats = [];
+        try {
+          stats = getHistory(latitude, longitude).stat.stats('value');
+        }catch (err){
+          stats = {
+          mean: 0,
+          min: 0,
+          max: 0,
+          var: 0,
+          sd: 0
+          };
+        }
+        return stats;
+      }
+      function getStatsAt(latitude, longitude, date){ 
+        var stats = [];
+        try {
+          stats = getHistoryAt(latitude, longitude, date).stat.stats('value');
+        }catch (err){
+          stats = {
+          mean: 0,
+          min: 0,
+          max: 0,
+          var: 0,
+          sd: 0
+          };
+        }
+        
+        var rry = getHistoryAt(latitude, longitude, date).toArray();
+        
+        if (rry == null){
+        } else {
+          for(var x = 0; x < rry.length; x++){
+              var str = x+ ": ";
+              for (var y = 0; y < rry[0].length; y++){
+                if(y == 0){
+                  str = str + "\t" + rry[x][y].split('T')[1].split('+')[0];
+                }else {
+                  str = str + "\t" + rry[x][y];
+                }
+              }
+            console.log(str);
+          }
+          console.log ("-")
+        }
+        
+        return stats;
+      }
+      
       
       </script>
       
@@ -474,7 +991,6 @@ for (i = 0; i <longs.length; i++) {
        
         function load(id){
          $.get( '/img/' + id , function(data, status) {
-            console.log(i, status);
           }).done(function() {
             //when the request has finished:
             
@@ -484,14 +1000,12 @@ for (i = 0; i <longs.length; i++) {
             
             changeRowValue_id(id, 'img', img);
             incrementLoaded();
-            console.log( id, "finished loading img svg, loading next image...");
           }).fail(function() {
             //when the request has failed:
             console.error( id, "loading contour failed for", id);
           });
           
           $.get( '/contour/' + id , function(data, status) {
-            console.log(id, status);
           }).done(function() {
             //when the request has finished:
             var contour = new Image();
@@ -500,7 +1014,6 @@ for (i = 0; i <longs.length; i++) {
             
             changeRowValue_id(id, 'contour', contour);
             incrementLoaded();
-            console.log( id, "finished loading contour png, loading next image...");
           }).fail(function() {
             //when the request has failed:
             console.error( "loading contour failed for", id);
@@ -519,107 +1032,132 @@ for (i = 0; i <longs.length; i++) {
           var dataArray = dataframe.toArray();
           for(var i = 0; i < range; i++){
             if(dataArray[i][5] == null){
-              console.log( "id is", dataArray[i][3], " preloading..");
               load( dataArray[i][3] );
             } else {
-              incrementLoaded();incrementLoaded();
-              console.log("not loading this ", i, dataArray[i][5], dataArray[i][6]);
+              incrementLoaded();
+              incrementLoaded();
             }
           }
+        }
+        
+        function updateMap(){
+          row = getRow( getDisplay_index() );
+          var data = row.get('data');
+          var img = row.get('img');
+          var contour = row.get('contour');
+          var date = row.get('date');
+            
+          setDate(date);
+          setImg(img.src);
+          
+          if(getContourToggle() == 'true'){
+            setContour(contour.src);
+          }else{
+            setContour("");
+          }
+          
+          clearFeatures();
+          chainAddFeature(date, data);
         }
         
         function next(){
           var range = getRange()-1;
           if ( getDisplay_index() < range ){
-            operateDisplay_index(1);
-            
-            row = getRow( getDisplay_index() );
-            console.log(getDisplay_index());
-            var data = row.get('data');
-            data.show();
+            setDisplay_index( getDisplay_index() + 1);
+            updateSliderValue();
+            updateMap();
           }
         }
+        
         function previous(){
           var range = getRange()-1;
           getDisplay_index();
           if ( getDisplay_index() > 0 ){
-            operateDisplay_index(-1);
-            
-            row = getRow( getDisplay_index() );
-            console.log( getDisplay_index() );
-            var data = row.get('data');
-            data.show();
+            setDisplay_index( getDisplay_index() - 1);
+            updateSliderValue();
+            updateMap();
           }
         }
+        
+        function chainAddFeature(date, data){
+          var decimal_places = 3;
+          data.chain(
+              row => row.set('history', getStats(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')))),
+              row => row.set('historyAtTime', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), date)),
+              row => addFeature(
+                  //gps location
+                  parseFloat(row.get('latitude')), 
+                  parseFloat(row.get('longitude')),
+                  //title
+                  "<h4>Messuring " + row.get('component')+ "</h4>"
+                  +"<br>"
+                  +"<table>"
+                    +"<tr>"
+                      +"<td>Date&ensp;</td>"
+                      +"<td>"+date+"</td>"
+                    +"</tr>"
+                    +"<tr>"
+                      +"<td>Value&ensp;</td>"
+                      +"<td>"+row.get('value') + " " + row.get('unit')+"</td>"
+                    +"</tr>"
+                  ,
+                  //content
+                  "<b>historical statistics</b>" 
+                  +"<table>"
+                    +"<tr>"
+                      +"<th></th>"+"<th>&ensp;total</th>"
+                      +"<th>&ensp;"+date.split(' ')[1]+"</th>"
+                    +"</tr>"
+                    +"<tr>"
+                      +"<td>avarage </td>"
+                      +"<td>"+ row.get('history').mean.toFixed(decimal_places) +"</td>"
+                      +"<td>&ensp;"+row.get('historyAtTime').mean.toFixed(decimal_places)+"</td>"
+                    +"</tr>"
+                    +"<tr>"
+                      +"<td>min </td>"
+                      +"<td>"+row.get('history').min.toFixed(decimal_places)+"</td>"
+                      +"<td>&ensp;"+row.get('historyAtTime').min.toFixed(decimal_places)+"</td>"
+                    +"</tr>"
+                    +"<tr>"
+                      +"<td>max </td>"
+                      +"<td>"+row.get('history').max.toFixed(decimal_places)+"</td>"
+                      +"<td>&ensp;"+row.get('historyAtTime').max.toFixed(decimal_places)+"</td>"
+                    +"</tr>"
+                    +"<tr>"
+                      +"<td>variance </td>"
+                      +"<td>"+row.get('history').var.toFixed(decimal_places)+"</td>"
+                      +"<td>&ensp;"+row.get('historyAtTime').var.toFixed(decimal_places)+"</td>"
+                    +"</tr>"
+                    +"<tr>"
+                      +"<td>standard deviation&ensp;</td>"
+                      +"<td>"+row.get('history').sd.toFixed(decimal_places)+"</td>"
+                      +"<td>&ensp;"+row.get('historyAtTime').sd.toFixed(decimal_places)+"</td>"
+                    +"</tr>"
+                  +"</table>"
+                  
+                  ), row => ""
+              );
+        }
+        
       </script>
 </head>
 
 <body onload="start()">
+  <input type="hidden" id="component" value="0" >
+  <input type="hidden" id="load_range" value="1">
+  <input type="hidden" id="contour_toggle" value=false>
 
-  <!-- select component drop down menu, if in the middle sets current component -->
-  <h3>
-    Component:
-    <select id="component" onChange="updateRange()">
-      {% for df in entries: %}
-       <option value = {{loop.index0}}> {{df.loc[0, 'component']}} </option>
-      {% endfor%}
-    </select>
-    
-    Load:
-    <select id="load_range" onChange="updateRange()">
-      <option value = 1 > 1 </option>
-       {% for i, row in entries[0].iterrows(): %}
-          {% if i%5 == 0 :%}
-            {% if i > 1:%}
-              <option value = {{i}} > {{i}} </option>
-            {% endif %}
-          {% endif %}
-          {% if not  i%5 == 0 :%}
-            {% if i ==  entries[0].index|length :%}
-              <option value = {{i}} > {{i}} </option>
-            {% endif %}
-          {% endif %}
-       {% endfor %}
-       
-    </select>
-    
-  </h3>
+ <div id="info" style = "display:none" > </div>
+  
+  <div id="map" class="map"><div id="popup"></div></div>
+    <div id="popupGPS" class="ol-popup">
+      <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+      <div id="popup-content"></div>
+    </div>
+  <div style="display: none;"></div>
+  <label style="display: none;"></label>
 
-  <p>
-  
-  contour
-  <input type="checkbox" id="contour_check" value="contour" onclick="">
-  <br>
-  entries:
-  <br>
-  <Button onclick="colapse()">tracking show/hide</Button>
-  
-  <div id="tracking" style="display: none">
-    <button id="FindMe" title="Find me" onclick="updateView()">Find me!</button>
-    </p>
-    <label for="track">
-    Track position
-    <input id="track" type="checkbox"/>
-    position accuracy : <code id="accuracy"></code>&nbsp;&nbsp;
-    altitude : <code id="altitude"></code>&nbsp;&nbsp;
-    altitude accuracy : <code id="altitudeAccuracy"></code>&nbsp;&nbsp;
-    heading : <code id="heading"></code>&nbsp;&nbsp;
-    speed : <code id="speed"></code>
-    </label>
-    <p></p>
-  </div>
-  <h2 id="title_map">
-  date: , component: 
-  </h2>
-  
-  <div id="map_div"></div>
-  
-  <Button onclick="previous()">javascript previous</Button>
-  ..
-  <Button onclick="next()">javascript next</Button>
-  
-  ..
-  <Button onclick="testdataframe()">test</Button>
+
 </body>
 
 </html>
