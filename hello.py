@@ -212,7 +212,7 @@ def show_data():
   #put them into a dataframe
   fdocs = json_normalize(docs);
   fdocs = DataFrame(fdocs, columns=['date', 'component', 'data', '_id'])
-  fdocs['date'] = to_datetime(fdocs['date'])
+  #fdocs['date'] = to_datetime(fdocs['date'])
   fdocs = fdocs.reset_index(drop=True)
   fdocs.sort_values(['date', 'component'])
   #get the components

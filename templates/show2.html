@@ -7,7 +7,10 @@
     <link rel="stylesheet" href="https://openlayers.org/en/v4.6.5/css/ol.css" type="text/css">
     <script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
     <script src="{{ url_for('static', filename='./proj4js-2.4.3/dist/proj4.js')}}"></script>
-    <script type=text/javascript src="{{url_for('static', filename='jquery.js') }}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='jquery.js') }}"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.js"></script>
     
     <link href="https://cdn.jsdelivr.net/npm/ol-geocoder@latest/dist/ol-geocoder.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/ol-geocoder"></script>
@@ -529,6 +532,43 @@
             'content': feature.get('content') 
           });
           $(element).popover('show');
+          
+          
+          var chr = document.getElementById('chart');
+          var chrs = new Chart(chr, {
+            type: 'line',
+            data: {
+              labels: feature.get('chart_label'),
+              datasets: [
+                { 
+                  label: 'value',
+                  data: feature.get('data'),
+                  borderWidth: 2,
+                  fill: false, 
+                  borderColor: 'black'
+                },
+                { 
+                  label: 'historical average',
+                  data: feature.get('historical_AVG'),
+                  borderWidth: 2,
+                  fill: false,
+                  borderColor: 'red'
+                }]
+            },
+            options: {
+              scales: {
+                yAxes: [{
+                  ticks: {
+                      // Include a dollar sign in the ticks
+                      callback: function(value, index, values) {
+                          return value +" "+feature.get('unit');
+                      }
+                  }
+                }]
+              }
+            }
+           });
+            
         } else {
           $(element).popover('destroy');
            var coordinate = evt.coordinate;
@@ -668,12 +708,16 @@
       text.innerHTML = 'Date: ' + date;
     }
     
-    function addFeature (latitude, longitude, title, content){
+    function addFeature (latitude, longitude, title, content, data, historical_AVG, chart_label, unit){
       var pos = ol.proj.fromLonLat([longitude, latitude]);
       var feature = new ol.Feature({
             geometry: new ol.geom.Point(pos),
             name: title,
-            content: content
+            content: content,
+            data: data,
+            historical_AVG: historical_AVG,
+            chart_label: chart_label,
+            unit: unit
       });
         feature.setStyle(iconStyle);
         vectorSource.addFeature(feature);
@@ -904,7 +948,7 @@
         return history;
       }
       
-      function getHistoryAt(latitude, longitude, date){
+      function getHistoryAtTime(latitude, longitude, date){
         var dataframe = getDataframe();
         var history = new DataFrame(
           {
@@ -914,15 +958,14 @@
             colum4: []
           }, ['date', 'component',  'value', 'unit']);
         
-        var requested_time = date.split(' ')[1];
-        
         for (var i = 0; i < dataframe.count(); i++){
           var station = getRow(i).get('data');
           station = station.find(row => row.get('latitude') == latitude && row.get('longitude') == longitude);
           
           if(station){
-            var time = station.get('toTime').split('T')[1].split('+')[0];
-            if (time == requested_time){
+            var time = new Date( station.get('toTime') );
+            
+            if (getTimeFromObj(time) == getTimeFromObj(date)){
               history = history.push( [station.get('toTime'), station.get('component'), station.get('value'), station.get('unit')] );
             }
           }
@@ -935,46 +978,26 @@
         try {
           stats = getHistory(latitude, longitude).stat.stats('value');
         }catch (err){
-          stats = {
-          mean: 0,
-          min: 0,
-          max: 0,
-          var: 0,
-          sd: 0
-          };
+          var history = new DataFrame(
+          {
+            column1:[0], colum2: [0], column3:[0], colum4: [0]
+          }, ['date', 'component',  'value', 'unit']);
+        
+          stats = history.stat.stats('value');
         }
         return stats;
       }
       function getStatsAt(latitude, longitude, date){ 
         var stats = [];
         try {
-          stats = getHistoryAt(latitude, longitude, date).stat.stats('value');
+          stats = getHistoryAtTime(latitude, longitude, date).stat.stats('value');
         }catch (err){
-          stats = {
-          mean: 0,
-          min: 0,
-          max: 0,
-          var: 0,
-          sd: 0
-          };
-        }
+          var history = new DataFrame(
+          {
+            column1:[0], colum2: [0], column3:[0], colum4: [0]
+          }, ['date', 'component',  'value', 'unit']);
         
-        var rry = getHistoryAt(latitude, longitude, date).toArray();
-        
-        if (rry == null){
-        } else {
-          for(var x = 0; x < rry.length; x++){
-              var str = x+ ": ";
-              for (var y = 0; y < rry[0].length; y++){
-                if(y == 0){
-                  str = str + "\t" + rry[x][y].split('T')[1].split('+')[0];
-                }else {
-                  str = str + "\t" + rry[x][y];
-                }
-              }
-            console.log(str);
-          }
-          console.log ("-")
+          stats = history.stat.stats('value');
         }
         
         return stats;
@@ -988,7 +1011,20 @@
           loadmap();
           load_for();
         }
-       
+        
+        function getTimeFromObj(dateobj) {
+          var h = dateobj.getHours();
+          var m = dateobj.getMinutes();
+          var s = dateobj.getSeconds();
+          
+          h = h > 10 ? h : "0" + h;
+          m = m > 10 ? m : "0" + m;
+          s = s > 10 ? s : "0" + s;
+          
+          return h + ":" + m + ":" + s;
+        }
+        
+        
         function load(id){
          $.get( '/img/' + id , function(data, status) {
           }).done(function() {
@@ -1045,9 +1081,9 @@
           var data = row.get('data');
           var img = row.get('img');
           var contour = row.get('contour');
-          var date = row.get('date');
-            
-          setDate(date);
+          var date = new Date (row.get('date'));
+          
+          setDate(date.toLocaleString());
           setImg(img.src);
           
           if(getContourToggle() == 'true'){
@@ -1079,11 +1115,48 @@
           }
         }
         
+        function goDownupTime(dateobj){
+          var date = new Date(dateobj);
+          var h = date.getHours();
+          h = h == 23 ? 0 : h + 1;
+          h = h == 23 ? 0 : h + 1;
+          h = h == 23 ? 0 : h + 1;//do it for 3 hours
+          date.setHours(h);
+          return date;
+        }
+        
         function chainAddFeature(date, data){
-          var decimal_places = 3;
+          var decimal_places = 3;          
+          
+          if( getDisplay_index() < getDataframe().count()+2){
+            var left1 = getRow( getDisplay_index()+1 );
+            var left_date1 = new Date(left1.get('date'));
+            var left2 = getRow( getDisplay_index()+2 );
+            var left_date2 = new Date(left2.get('date'));
+            
+            left1 = left1.get('data');
+            left2 = left2.get('data');
+          }else { //if there is no more just display current one again..
+            console.error("no more indexes to look at for chart history")
+            var left1 = getRow( getDisplay_index() );
+            var left_date1 = new Date(left1.get('date'));
+            var left2 = getRow( getDisplay_index() );
+            var left_date2 = new Date(left2.get('date'));
+            
+            left1 = left1.get('data');
+            left2 = left2.get('data');
+          }
+          
+          var right_date1 = goDownupTime(date);
+          var right_date2 = goDownupTime(right_date1);
+          
           data.chain(
               row => row.set('history', getStats(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')))),
               row => row.set('historyAtTime', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), date)),
+              row => row.set('historyAtTimeleft1', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), left_date1)),
+              row => row.set('historyAtTimeleft2', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), left_date2)),
+              row => row.set('historyAtTimeright1', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), right_date1)),
+              row => row.set('historyAtTimeright2', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), right_date2)),
               row => addFeature(
                   //gps location
                   parseFloat(row.get('latitude')), 
@@ -1094,7 +1167,7 @@
                   +"<table>"
                     +"<tr>"
                       +"<td>Date&ensp;</td>"
-                      +"<td>"+date+"</td>"
+                      +"<td>"+date.toLocaleString()+"</td>"
                     +"</tr>"
                     +"<tr>"
                       +"<td>Value&ensp;</td>"
@@ -1106,7 +1179,7 @@
                   +"<table>"
                     +"<tr>"
                       +"<th></th>"+"<th>&ensp;total</th>"
-                      +"<th>&ensp;"+date.split(' ')[1]+"</th>"
+                      +"<th>"+getTimeFromObj(date)+"</th>"
                     +"</tr>"
                     +"<tr>"
                       +"<td>avarage </td>"
@@ -1134,10 +1207,23 @@
                       +"<td>&ensp;"+row.get('historyAtTime').sd.toFixed(decimal_places)+"</td>"
                     +"</tr>"
                   +"</table>"
+                  +"<br>"
+                  +"<canvas id='chart' width='200' height='200'></canvas>",
                   
+                  //data to put in chart
+                  [ ( left2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? -1 : left2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')), 
+                  (left1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? -1 : left1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')),
+                  row.get('value') ], //current
+                  [row.get('historyAtTimeleft2').mean, row.get('historyAtTimeleft1').mean, 
+                  row.get('historyAtTime').mean,
+                  row.get('historyAtTimeright1').mean, row.get('historyAtTimeright2').mean ], //average
+                  [getTimeFromObj(left_date2), getTimeFromObj(left_date1), getTimeFromObj(date), getTimeFromObj(right_date1), getTimeFromObj(right_date2)], //labels
+                  row.get('unit')
                   ), row => ""
               );
         }
+        
+        
         
       </script>
 </head>
