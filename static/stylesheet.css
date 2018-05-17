@@ -1,0 +1,219 @@
+html, body {
+height: 100%; 
+width: 100%;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+.map:-moz-full-screen {
+  height: 100%;    
+  width: 100%;
+}
+.map:-webkit-full-screen {
+  height: 100%;    
+  width: 100%;
+}
+.map:-ms-fullscreen {
+  height: 100%;    
+  width: 100%;
+}
+.map:fullscreen {
+  height: 100%;    
+  width: 100%;
+}
+/* position the rotate control lower than usual */
+.ol-rotate {
+  top: 3em;
+}
+
+/* Popup stuff*/
+
+.ol-popup {
+  position: absolute;
+  background-color: white;
+  -webkit-filter: drop-shadow(5px 5px 5px rgba(0,0,0,0.3));
+  filter: drop-shadow(5px 5px 5px rgba(0,0,0,0.3));
+  padding: 10px;
+  border-radius: 10px;
+  border: 2px solid #cccccc;
+  bottom: 10px;
+  left: -50px;
+  min-width: 220px;
+  font-style: normal;
+  font-family: Tahoma, Geneva, sans-serif; 
+  /* https://www.w3schools.com/cssref/css_websafe_fonts.asp */
+  font-size: 0.98em;
+}
+.ol-popup:after, .ol-popup:before {
+  top: 100%;
+  border: solid transparent;
+  content: "";
+  height: 0;
+  width: 0;
+  position: absolute;
+  pointer-events: none;
+}
+.ol-popup:after {
+  border-top-color: white;
+  border-width: 10px;
+  left: 48px;
+  margin-left: -10px;
+}
+.ol-popup:before {
+  border-top-color: #cccccc;
+  border-width: 12px;
+  left: 48px;
+  margin-left: -12px;
+}
+.ol-popup-closer {
+  text-decoration: none;
+  position: absolute;
+  top: 2px;
+  right: 8px;
+}
+.ol-popup-closer:after {
+  content: "✖";
+}
+
+
+
+
+
+
+/** Slider Stuff **/
+.slider-control {
+  bottom: 0.3em;
+  left: 50%;
+  width: 50%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 1em;
+    border-radius: 1em;   
+    background: #d3d3d3;
+    outline: none;
+    opacity: 0.7;
+    -webkit-transition: .2s;
+    transition: opacity .2s;
+  
+}
+
+#slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 10%; 
+    background: #7f9dc3;
+    cursor: pointer;
+}
+
+#slider::-moz-range-thumb {
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    background: #41a9f4;
+    cursor: pointer;
+}
+
+
+.popover{
+    min-height: 20vmax;
+    min-width: 20vmax;
+    /*width: 290px; /* Cant go over 280 i think */
+}
+
+
+.position-north {
+  top: 8em;
+  left: .5em;
+}
+
+
+.previous-button{
+  top: 1.5em;
+  left: 40%;
+  margin-right: -40%;
+  transform: translate(-50%, -50%);
+}
+
+.next-button{
+  top: 1.5em;
+  left: 60%;
+  margin-right: -60%;
+  transform: translate(-50%, -50%);
+}
+
+.play-pause-button{
+  top: 1.5em;
+  left: 50%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+
+.Date-text {
+  font-weight: bold;
+  font-family: Tahoma, Geneva, sans-serif; 
+  top: .6em;
+  left: 3.5em;
+}
+
+.range-text {
+  width: 11.3em;
+  font-weight: bold;
+  font-family: Tahoma, Geneva, sans-serif; 
+  bottom: 0.6em;
+  width: 7.5em;
+  right: 2.7em;
+}
+
+.contour{
+  font-weight: bold;
+  font-family: Tahoma, Geneva, sans-serif; 
+  bottom: 4.5em;
+  left: .5em;
+}
+
+.range-control {
+  font-weight: bold;
+  font-family: Tahoma, Geneva, sans-serif; 
+  bottom: 2.5em;
+  left: .5em;
+}
+
+.dropdown-control {
+  bottom: 0.5em;
+  left: .5em;
+  font-weight: bold;
+  font-family: Tahoma, Geneva, sans-serif; 
+}
+.Loading-text {
+  bottom: 50%;
+  left: 50%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%); 
+  font-size: 3.5em;
+  font-weight: bold;
+  font-family: Tahoma, Geneva, sans-serif;
+}
+body {
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+}
+
+html, body, #map {
+    height: 100%;
+    font: 10pt "Helvetica Neue", Arial, Helvetica, sans-serif;
+}
+
+#gradiantIMG{
+  width: 100%;
+  height: 5em;
+}

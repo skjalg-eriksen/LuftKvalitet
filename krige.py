@@ -62,13 +62,6 @@ def C( P, h, bw ):
         return c0
     return c0-SVh( P, h, bw)
 
-'''
-plot(sv[0], sv[1], '.-')
-xlabel('lag [m]')
-ylabel('semivariance')
-title('Sample Semivariance')
-savefig('sample_semivariogram2.png',fmt='png',dpi=200)
-'''
 
 def opt ( fct, x, y, C0, parameterRange=None, meshSize=1000 ):
 
@@ -122,15 +115,6 @@ def cvmodel ( P, model, hs, bw ):
    # covfct = lambda h, a=param: model( h, a, C0 ) # this makes a unflippd curve compared to the tutorial, found in comments
     return covfct
 
-'''
-sp = cvmodel( P, model=spherical, hs=np.arange(0,10500, 500), bw=500 )
-plot( sv[0], sv[1], '.-' )
-plot ( sv[0], sp( sv[0] ) ) ;
-title ('Spherical Model')
-ylabel('Semivariance')
-xlabel('Lag [m]')
-savefig('semivariogram_model.png', fmt='png',dpi=200)
-'''
 
 def krige( P, model, hs, bw, u, N ):
     '''

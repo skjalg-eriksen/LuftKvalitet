@@ -1,5 +1,0 @@
----
-applications:
- - name: luftkvalitet
-   random-route: true
-   memory: 1GB
