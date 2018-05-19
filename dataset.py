@@ -1,13 +1,9 @@
 from urllib2 import Request, urlopen, URLError
 import json
 
-import numpy as np
-import math
 from pandas import DataFrame, Series
 from pandas.io.json import json_normalize
-from pylab import *
 import utm
-from decimal import Decimal
 
 # gps coordinates for map
 # TOP LEFT      59.963886, 10.662291

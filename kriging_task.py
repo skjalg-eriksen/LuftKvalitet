@@ -24,11 +24,8 @@ THE SOFTWARE.
 from krige import SVh, SV, C, spherical, opt, cvmodel, krige
 
 import numpy as np
-from pandas.io.json import json_normalize
 from pylab import *
-import numpy as np
 from pandas import DataFrame, Series
-from scipy.spatial.distance import pdist, squareform
 import utm;
 
 
@@ -86,7 +83,7 @@ def krige_task(data):
     t = t+1
     z.loc[len(z)] = new_df
   
-  # part of our data set recording porosity
+  # part of our data set recording pollution
   P = np.array( z[['x','y','value']] )
   # bandwidth
   bw = 15500
