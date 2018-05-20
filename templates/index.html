@@ -9,6 +9,8 @@
     <script src="{{ url_for('static', filename='./proj4js-2.4.3/dist/proj4.js')}}"></script>
     <script type="text/javascript" src="{{url_for('static', filename='jquery.js') }}"></script>
 
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.1/moment.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.js"></script>
 
@@ -558,6 +560,17 @@
                 },
                 options: {
                   scales: {
+                    xAxes: [{
+                      type: 'time',
+                      ticks: {
+                        source: 'labels'
+                      },
+                      time: {
+                        format: 'MM/DD/YYYY HH:mm',
+                        tooltipFormat: 'HH:mm:ss',
+                        unit: 'minute'
+                      }
+                    }],
                     yAxes: [{
                       ticks: {
                           // Include a dollar sign in the ticks
@@ -659,16 +672,7 @@
           });
           
           var sidebar = new ol.control.Sidebar({ element: 'sidebar', position: 'right' });
-          map.addControl(sidebar);
-    
-          function wait(ms){
-             var start = new Date().getTime();
-             var end = start;
-             while(end < start + ms) {
-               end = new Date().getTime();
-            }
-          }
-        
+          map.addControl(sidebar); 
     
     
         }
@@ -745,16 +749,6 @@
         function updateSliderValue(){
           slider = document.getElementById("slider");
           slider.value = getDisplay_index();
-        }
-    </script>
-
-    <script>
-        function colapse(){
-         if(document.getElementById("tracking").style.display == "inline"){
-            document.getElementById("tracking").style.display = "none";
-          }else{
-            document.getElementById("tracking").style.display = "inline";
-            }
         }
     </script>
     <script>
@@ -1143,32 +1137,27 @@
         
         //helper functions
         function addHours(dateobj, hours){
-          //if hours is not defined set it to 1 hours
-          hours = hours == null ? 1 : hours;
-          var date = new Date(dateobj);
-          var h = date.getHours();
+          var date = moment(dateobj);
+          date.add(hours, 'hours');
           
-          for (var i = 0; i < hours; i++){
-            h = h == 23 ? 0 : h + 1;
-          }          
-          date.setHours(h);
           return date;
         }
         function subtractHours(dateobj, hours){
-          //if hours is not defined set it to 1 hours
-          hours = hours == null ? 1 : hours;
-          var date = new Date(dateobj);
-          var h = date.getHours();
+          var date = moment(dateobj);
+          date.subtract(hours, 'hours');
           
-          for (var i = 0; i < hours; i++){
-            h = h == 0 ? 23 : h - 1;
-          }
-          date.setHours(h);
-          return date;
+          return date.toDate();
         }
         
         function chainAddFeature(date, data){
           var decimal_places = 3; //how many decimal places to include in the table of stats
+          var hour_range = 7;
+         
+         //get dates with 3 hour interval.
+          var left_label_date_1 = subtractHours(date, 3);
+          var left_label_date_2 = subtractHours(left_date1, 3);
+          var right_label_date_1 = addHours(date, 3);
+          var right_label_date_2 = addHours(right_date1, 3);
          
          //get dates with 3 hour interval.
           var left_date1 = subtractHours(date, 3);
@@ -1206,80 +1195,91 @@
           //get the station data
           right2 = right2.get('data');
           
+          
+          
+          
+          
           data.chain(
-              row => row.set('history', getStats(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')))),
-              row => row.set('historyAtTime', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), date)),
-              row => row.set('historyAtTimeleft1', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), left_date1)),
-              row => row.set('historyAtTimeleft2', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), left_date2)),
-              row => row.set('historyAtTimeright1', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), right_date1)),
-              row => row.set('historyAtTimeright2', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), right_date2)),
-              row => addFeature(
-                  //gps location
-                  parseFloat(row.get('latitude')), 
-                  parseFloat(row.get('longitude')),
-                  //title
-                  "<h4>Messuring " + row.get('component')+ "</h4>"
-                  +"<br>"
-                  +"<table>"
-                    +"<tr>"
-                      +"<td>Date&ensp;</td>"
-                      +"<td>"+date.toLocaleString()+"</td>"
-                    +"</tr>"
-                    +"<tr>"
-                      +"<td>Value&ensp;</td>"
-                      +"<td>"+row.get('value') + " " + row.get('unit')+"</td>"
-                    +"</tr>"
-                  ,
-                  //content
-                  "<b>historical statistics</b>" 
-                  +"<table>"
-                    +"<tr>"
-                      +"<th></th>"+"<th>&ensp;total</th>"
-                      +"<th>"+getTimeFromObj(date)+"</th>"
-                    +"</tr>"
-                    +"<tr>"
-                      +"<td>avarage </td>"
-                      +"<td>"+ row.get('history').mean.toFixed(decimal_places) +"</td>"
-                      +"<td>&ensp;"+row.get('historyAtTime').mean.toFixed(decimal_places)+"</td>"
-                    +"</tr>"
-                    +"<tr>"
-                      +"<td>min </td>"
-                      +"<td>"+row.get('history').min.toFixed(decimal_places)+"</td>"
-                      +"<td>&ensp;"+row.get('historyAtTime').min.toFixed(decimal_places)+"</td>"
-                    +"</tr>"
-                    +"<tr>"
-                      +"<td>max </td>"
-                      +"<td>"+row.get('history').max.toFixed(decimal_places)+"</td>"
-                      +"<td>&ensp;"+row.get('historyAtTime').max.toFixed(decimal_places)+"</td>"
-                    +"</tr>"
-                    +"<tr>"
-                      +"<td>variance </td>"
-                      +"<td>"+row.get('history').var.toFixed(decimal_places)+"</td>"
-                      +"<td>&ensp;"+row.get('historyAtTime').var.toFixed(decimal_places)+"</td>"
-                    +"</tr>"
-                    +"<tr>"
-                      +"<td>standard deviation&ensp;</td>"
-                      +"<td>"+row.get('history').sd.toFixed(decimal_places)+"</td>"
-                      +"<td>&ensp;"+row.get('historyAtTime').sd.toFixed(decimal_places)+"</td>"
-                    +"</tr>"
-                  +"</table>"
-                  
-                  +"<canvas id='chart' width='200' height='200'></canvas>",
-                  
-                  //data to put in chart
-                  [ ( left2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : left2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')), 
-                  (left1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : left1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')),
-                  row.get('value'),
-                  ( right1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : right1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')), 
-                  ( right2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : right2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value'))
-                  ], //current values
-                  [row.get('historyAtTimeleft2').mean, row.get('historyAtTimeleft1').mean, 
-                  row.get('historyAtTime').mean,
-                  row.get('historyAtTimeright1').mean, row.get('historyAtTimeright2').mean ], //average values
-                  [getTimeFromObj(left_date2), getTimeFromObj(left_date1), getTimeFromObj(date), getTimeFromObj(right_date1), getTimeFromObj(right_date2)], //labels
-                  row.get('unit')
-                  ), row => ""
-              );
+            row => row.set('history', getStats(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')))),
+            row => row.set('historyAtTime', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), date)),
+            row => row.set('historyAtTimeleft1', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), left_date1)),
+            row => row.set('historyAtTimeleft2', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), left_date2)),
+            row => row.set('historyAtTimeright1', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), right_date1)),
+            row => row.set('historyAtTimeright2', getStatsAt(parseFloat(row.get('latitude')), parseFloat(row.get('longitude')), right_date2)),
+            row => addFeature(
+              //gps location
+              parseFloat(row.get('latitude')), 
+              parseFloat(row.get('longitude')),
+              
+              //title
+              "<h4>Messuring " + row.get('component')+ "</h4>"
+              +"<br>"
+              +"<table>"
+                +"<tr>"
+                  +"<td>Date&ensp;</td>"
+                  +"<td>"+date.toLocaleString()+"</td>"
+                +"</tr>"
+                +"<tr>"
+                  +"<td>Value&ensp;</td>"
+                  +"<td>"+row.get('value') + " " + row.get('unit')+"</td>"
+                +"</tr>"
+              ,
+              //content
+              "<b>historical statistics</b>" 
+              +"<table>"
+                +"<tr>"
+                  +"<th></th>"+"<th>&ensp;total</th>"
+                  +"<th>"+getTimeFromObj(date)+"</th>"
+                +"</tr>"
+                +"<tr>"
+                  +"<td>avarage </td>"
+                  +"<td>"+ row.get('history').mean.toFixed(decimal_places) +"</td>"
+                  +"<td>&ensp;"+row.get('historyAtTime').mean.toFixed(decimal_places)+"</td>"
+                +"</tr>"
+                +"<tr>"
+                  +"<td>min </td>"
+                  +"<td>"+row.get('history').min.toFixed(decimal_places)+"</td>"
+                  +"<td>&ensp;"+row.get('historyAtTime').min.toFixed(decimal_places)+"</td>"
+                +"</tr>"
+                +"<tr>"
+                  +"<td>max </td>"
+                  +"<td>"+row.get('history').max.toFixed(decimal_places)+"</td>"
+                  +"<td>&ensp;"+row.get('historyAtTime').max.toFixed(decimal_places)+"</td>"
+                +"</tr>"
+                +"<tr>"
+                  +"<td>variance </td>"
+                  +"<td>"+row.get('history').var.toFixed(decimal_places)+"</td>"
+                  +"<td>&ensp;"+row.get('historyAtTime').var.toFixed(decimal_places)+"</td>"
+                +"</tr>"
+                +"<tr>"
+                  +"<td>standard deviation&ensp;</td>"
+                  +"<td>"+row.get('history').sd.toFixed(decimal_places)+"</td>"
+                  +"<td>&ensp;"+row.get('historyAtTime').sd.toFixed(decimal_places)+"</td>"
+                +"</tr>"
+              +"</table>"
+              
+              +"<canvas id='chart' width='200' height='200'></canvas>",
+              
+              //data to put in chart
+              
+              //current values
+              [ ( left2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : left2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')), 
+                (left1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : left1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')),
+                {x: date, y:row.get('value')},
+                ( right1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : right1.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value')), 
+                ( right2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}) == null ? null : right2.find({'latitude': row.get('latitude')}, {'longitude': row.get('longitude')}).get('value'))
+              ], 
+              
+              //average values
+              [{ x: left_date2, y: row.get('historyAtTimeleft2').mean }, { x: left_date1 , y: row.get('historyAtTimeleft1').mean }, 
+              { x: date, y: row.get('historyAtTime').mean },
+              { x: right_date1, y: row.get('historyAtTimeright1').mean }, { x: right_date2, y: row.get('historyAtTimeright2').mean } ], 
+              
+              //labels
+              [left_label_date_2, left_label_date_1, date, right_label_date_1, right_label_date_2],
+              row.get('unit')
+              ), row => ""
+          );
         }
     </script>
 </head>
@@ -1332,8 +1332,6 @@
               NILU public api</a> which is also used by
                     <a href="http://www.luftkvalitet.info/home.aspx">
               luftkvalitet.info</a>. </p>
-
-                <p>Stuff <a href="https://en.wikipedia.org/wiki/Oslo_Metropolitan_University">Link to documentation</a></p>
             </div>
 
         </div>

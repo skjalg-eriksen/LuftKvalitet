@@ -154,6 +154,9 @@ def get_img(_id):
   #go to start of file
   buffr.seek(0)
   
+  #disconnect from db
+  client.disconnect()
+  
   return send_file(buffr, mimetype='image/svg+xml')
 
 
@@ -201,6 +204,10 @@ def get_contour(_id):
   fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
   #set buffer to point at the start.
   buffr.seek(0)
+  
+  #disconnect from db
+  client.disconnect()
+  
   #send the buffer with the contour plot
   return send_file(buffr, mimetype='image/png')
 
@@ -219,7 +226,7 @@ def get_info(_id):
   H = simplejson.loads(doc['krige_data'])
   z = read_json(doc['data'], orient='index')
   date = doc['date']
- 
+  
   #set standard minmax, these will be changed based on component
   maxvalue = 100;
   minvalue = 0;
@@ -249,7 +256,8 @@ def get_info(_id):
   fig.savefig(buffr, dpi = 400)
   
   buffr.seek(0)
-  
+  #disconnect from db
+  client.disconnect()
   return send_file(buffr, mimetype='image/png')
   
 @app.route('/')
@@ -288,6 +296,8 @@ def show_data():
     tmp = tmp.reset_index(drop=True)
     #put the dataframe into the list
     complist[i] = tmp;
+  #disconnect from db
+  client.disconnect()
   return render_template('index.html', entries = complist, data = data);
   
 
@@ -329,6 +339,8 @@ def all_entries():
     tmp = tmp.reset_index(drop=True)
     #put the dataframe into the list
     complist[i] = tmp;
+  #disconnect from db
+  client.disconnect()
   return render_template('entries.html', entries = complist, data = data);
   
 @app.route('/data_min')
@@ -372,6 +384,8 @@ def kriging_plot():
     db = client.create_database(db_name, throw_on_exists=False)
     #store document
     document = db.create_document(document);
+  #disconnect from db
+  client.disconnect()
   return data.to_html()
 
 #deletes entries, and old data
@@ -427,6 +441,8 @@ def clean_db():
         comp = comp.drop( comp[comp.date == row['date'] ].head(1).index )
         db[row['_id']].delete()
     print comp
+  #disconnect from db
+  client.disconnect()
   
 #set the time interval to run kriging and clean_db
 @cron.interval_schedule(hours=3)
@@ -436,7 +452,6 @@ def job_function():
 
 # Shutdown the cron thread if the web process is stopped (used to shutdown thread cycling the krige_task)
 atexit.register(lambda: cron.shutdown(wait=False))
-atexit.register(client.disconnect())
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=port, debug=True)
