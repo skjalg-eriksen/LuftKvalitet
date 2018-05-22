@@ -97,12 +97,12 @@ def krige_task(data):
   nx = 48
   ny = 60
   
-  # consider all the points avaiable, but no more than 10.
+  # consider all the points available, but no more than 10.
   num_points = len(z.index)
   if (num_points > 10):
     num_points = 10;
   
-  # make an numpey array
+  # make an numpy array
   Z = np.zeros((ny,nx))
   
   # divide the range of the map width, height with our resolution

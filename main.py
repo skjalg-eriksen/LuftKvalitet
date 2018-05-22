@@ -54,9 +54,6 @@ Y0, Y1 = 0, TOP-BOTTOM
 cron = Scheduler(daemon=True)
 cron.start()
 
-# Emit Bluemix deployment event
-cf_deployment_tracker.track()
-
 app = Flask(__name__)
 
 # On Bluemix, get the port number from the environment variable PORT
@@ -143,12 +140,10 @@ def get_img(_id):
   fig, ax = subplots()
   ax.imshow(H, cmap=my_cmap, vmin=minvalue, vmax=maxvalue, origin='lower', interpolation='gaussian', alpha=0.7, extent=[X0, X1, Y0, Y1])
   ax.axis('off')
-  #fig.dpi=400
   
   #set proper image size and extent to plot
   fig.set_size_inches(5.95, 5)
   imgextent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-  #fig.savefig(buffr, dpi = 400, bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
   fig.savefig(buffr, format='svg', bbox_inches=imgextent, transparent=True, pad_inches=0, frameon=None)
   
   #go to start of file
@@ -355,7 +350,6 @@ def data_min():
   fdata = DataFrame(fdata, columns=['latitude','longitude', 'value', 'unit', 'component'] )
   return fdata.to_html()
 
-@app.route('/kriging_plot')
 def kriging_plot():
   #date =  str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
   data = dataset.data()
