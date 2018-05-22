@@ -1,0 +1,9 @@
+applications:
+- name: luftkvalitet
+  disk_quota: 1G
+  instances: 1
+  memory: 256M
+  buildpack: python_buildpack
+  routes:
+  - route: luftkvalitet.eu-gb.mybluemix.net
+  stack: cflinuxfs2
