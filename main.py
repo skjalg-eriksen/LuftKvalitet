@@ -29,6 +29,7 @@ from pylab import *
 from pandas import DataFrame, Series, to_datetime
 from pandas.io.json import json_normalize, read_json
 import datetime
+import time
 
 # import our other python files
 from kriging_task import krige_task;
@@ -416,8 +417,17 @@ def clean_db():
     complist[i] = tmp;
 
   #how many days to keep data, each day is about 20KB worth of data
-  DAYS_OF_DATA_TO_KEEP = 50
+  #keep this number under 25, as long as you are on a lite/trial account
+  #cloudant lite wont let you fetch more than 25 days worth of data
+  DAYS_OF_DATA_TO_KEEP = 20
 
+  #rate limit, changes pr second to the database
+  #cloudant lite has a rate limit of 10 changes pr second.
+  RATE_LIMIT = 10
+  
+  #changes before rate limit is reached
+  changes = 0;
+  
   #go through all dataframes with data on each component
   for comp in complist:
     #go through each entry in the dataframe
@@ -428,13 +438,20 @@ def clean_db():
         comp = comp.drop( comp[comp.date == row['date'] ].head(1).index )
         #remove it from the database
         db[row['_id']].delete()
+        changes += 1;
         continue;
         
       #if there are entries older than DAYS_OF_DATA_TO_KEEP, remove them
       if((row['date'].today() - row['date']) > datetime.timedelta(DAYS_OF_DATA_TO_KEEP)):
         comp = comp.drop( comp[comp.date == row['date'] ].head(1).index )
         db[row['_id']].delete()
-    print comp
+        changes += 1;
+      
+      #sleep so you dont breach the rate limit
+      if changes < RATE_LIMIT-2:
+        time.sleep(1);
+        changes = 0;
+        
   #disconnect from db
   client.disconnect()
   
